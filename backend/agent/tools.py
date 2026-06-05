@@ -33,6 +33,11 @@ try:
 except ImportError:
     _log_blocker_action = None  # type: ignore
 
+try:
+    from backend.actions.log_blocker import log_resolved_blocker as _log_resolved_blocker_action
+except ImportError:
+    _log_resolved_blocker_action = None  # type: ignore
+
 
 # ─────────────────────────────────────────────
 # Tool definitions
@@ -128,6 +133,44 @@ def log_blocker(
     )
 
 
+@tool
+def log_resolved_blocker(
+    blocker: str,
+    resolution: str,
+    team_id: str,
+    employment_type: str = "fte",
+) -> str:
+    """
+    Logs a RESOLVED onboarding blocker to memory so future employees are warned proactively.
+    This is the memory flywheel — every logged resolution makes the agent smarter for the next joiner.
+
+    ALWAYS call this when:
+    - A user reports they were stuck and found a fix
+    - The agent discovers a workaround not already in memory
+    - A ticket was resolved via a non-obvious path
+
+    Args:
+        blocker: What went wrong (e.g. "Confluence request pending 5 days").
+        resolution: How it was fixed (e.g. "Escalated to @it-confluence directly").
+        team_id: Team this applies to (e.g. "platform", "infra_security").
+        employment_type: "fte", "contractor", or "intern" (default: "fte").
+
+    Returns:
+        Confirmation that the resolution was saved to memory.
+    """
+    if _log_resolved_blocker_action:
+        return _log_resolved_blocker_action(
+            blocker=blocker,
+            resolution=resolution,
+            team_id=team_id,
+            employment_type=employment_type,
+        )
+    return (
+        f"[STUB] Resolved blocker saved to memory for {team_id} ({employment_type}): "
+        f"'{blocker}' → '{resolution}'"
+    )
+
+
 # ─────────────────────────────────────────────
 # Tool registry — the agent imports this list
 # ─────────────────────────────────────────────
@@ -136,4 +179,5 @@ TOOL_REGISTRY: list = [
     raise_ticket,
     send_reminder,
     log_blocker,
+    log_resolved_blocker,
 ]
