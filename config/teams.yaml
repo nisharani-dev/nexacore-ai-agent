@@ -1,0 +1,181 @@
+company:
+  id: "company"
+  name: "AcmeCorp"
+  type: "company"
+  accesses:
+    - "VPN (GlobalProtect)"
+    - "SSO (Okta) — request via IT portal, takes 1 day"
+    - "Badge / Physical Access — collect from Reception, Building 2"
+    - "HR Portal (Workday)"
+    - "Company email (Google Workspace)"
+    - "Slack workspace"
+    - "Employee handbook (Confluence: /wiki/company/handbook)"
+  notes: >
+    IT tickets go to it-helpdesk@acmecorp.com — NOT the Slack #it-help channel
+    (that channel is read-only announcements). First day: badge pickup is 9-5
+    only. If you join on a Monday, request badge the Friday before.
+
+  divisions:
+    - id: "engineering"
+      name: "Engineering Org"
+      type: "division"
+      accesses:
+        - "GitHub (org: acmecorp) — SSO-linked, auto-provisioned after Okta"
+        - "Jira (Engineering workspace)"
+        - "Confluence (Engineering space)"
+        - "AWS baseline access — request via #it-aws-access, takes 3 days"
+        - "DataDog (read access) — auto-provisioned"
+        - "1Password (Engineering vault)"
+      notes: >
+        AWS access is the single biggest blocker for engineers. Request it on
+        Day 1. The ticket goes to CloudOps, NOT IT — tag @cloudops-lead in
+        #it-aws-access or it silently dies. GitHub auto-provisions only if your
+        company email matches your GitHub account; if not, DM @it-github.
+
+      teams:
+        - id: "platform"
+          name: "Platform Engineering"
+          type: "team"
+          accesses:
+            - "AWS elevated (EC2, RDS, S3 full access) — separate request from baseline"
+            - "Terraform Cloud — request via @platform-lead"
+            - "ArgoCD — request via @platform-lead"
+            - "PagerDuty — request via @platform-lead (on-call rotation added after 2 weeks)"
+            - "Confluence spaces: /wiki/platform, /wiki/infra-runbooks"
+            - "Slack channels: #platform-team, #on-call, #deployments"
+          notes: >
+            Onboarding doc lives at /wiki/platform/onboarding — but it is
+            OUTDATED. Use the agent instead. Terraform Cloud access can take
+            up to 5 days if @platform-lead is travelling; ping the backup
+            lead (@platform-lead-backup) after 2 days of silence.
+            Do NOT join #on-call until PagerDuty is provisioned.
+
+          sub_teams:
+            - id: "infra_security"
+              name: "Infra Security"
+              type: "sub_team"
+              accesses:
+                - "AWS security audit role — additional IAM request"
+                - "Vault (HashiCorp) — request via IT security ticket"
+                - "Snyk — auto-provisioned if on infra_security Jira project"
+                - "Compliance training (mandatory before Vault access is granted)"
+                - "Confluence space: /wiki/security-runbooks (restricted)"
+              notes: >
+                Vault access is blocked until compliance training is completed.
+                Training link is in #security-onboarding — it takes ~4 hours.
+                Do it Day 1 or Vault access will be delayed by a full week.
+                Snyk auto-provisions only if your Jira account is on the
+                infra_security project; verify this before chasing IT.
+
+        - id: "data_platform"
+          name: "Data Platform"
+          type: "team"
+          accesses:
+            - "Snowflake (read access default; write access needs data-lead approval)"
+            - "dbt Cloud — request via @data-lead"
+            - "Airflow (internal) — credentials in 1Password Engineering vault"
+            - "Metabase — auto-provisioned"
+            - "Confluence spaces: /wiki/data-platform, /wiki/data-catalog"
+            - "Slack channels: #data-platform, #data-alerts"
+          notes: >
+            Snowflake write access takes 3-5 days and requires your manager
+            to approve in the IT portal. Do not wait — request Day 1.
+            The dbt Cloud workspace uses a non-SSO login; credentials are
+            in 1Password under "dbt-cloud-shared". Airflow is internal-only;
+            must be on VPN.
+
+        - id: "backend_api"
+          name: "Backend API"
+          type: "team"
+          accesses:
+            - "AWS (Lambda, API Gateway, SQS access)"
+            - "Postman Team workspace — request via @backend-lead"
+            - "Confluence spaces: /wiki/backend-api, /wiki/api-contracts"
+            - "Slack channels: #backend-api, #api-incidents"
+          notes: >
+            Postman workspace contains all internal API contracts — request
+            access immediately, it is needed from Day 1. Lambda deployments
+            go through ArgoCD; coordinate with Platform team.
+
+    - id: "finance"
+      name: "Finance"
+      type: "division"
+      accesses:
+        - "SAP (Finance ERP) — provisioning takes 5-7 days, involves Finance IT"
+        - "Netsuite (reporting) — auto-provisioned for Finance"
+        - "Concur (expenses)"
+        - "Confluence (Finance space)"
+        - "Slack channels: #finance-team, #finance-ops"
+      notes: >
+        SAP provisioning is handled by Finance IT, not the main IT helpdesk.
+        Email financeIT@acmecorp.com directly. The main IT ticket system will
+        route it to the wrong queue and it will sit for a week.
+
+      teams:
+        - id: "fp_and_a"
+          name: "FP&A"
+          type: "team"
+          accesses:
+            - "SAP (FP&A module)"
+            - "Adaptive Insights — request via @fp-and-a-lead"
+            - "Tableau (Finance workspace) — request via IT portal"
+          notes: >
+            Adaptive Insights SSO breaks for new accounts; the workaround is
+            to log in once via direct URL before SSO is configured. Ask
+            @fp-and-a-lead for the direct URL.
+
+    - id: "product"
+      name: "Product"
+      type: "division"
+      accesses:
+        - "Jira (Product workspace)"
+        - "Confluence (Product space)"
+        - "Figma (org account) — request via @design-ops"
+        - "Amplitude (analytics) — auto-provisioned"
+        - "Slack channels: #product, #product-design"
+      notes: >
+        Figma seats are limited; request the day you join or you may wait
+        several days. Amplitude SSO works only after Okta groups are set;
+        if it fails after 2 days, ping @it-okta.
+
+exception_flows:
+  contractor:
+    jira_license: "JIRA-SOFTWARE-EXTERNAL"
+    github_org_team: "contractors"
+    aws_account: "acmecorp-contractors"
+    restricted_spaces:
+      - /wiki/company/financials
+      - /wiki/security-runbooks
+    extra_steps:
+      - "Submit contractor NDA via DocuSign before any access is granted"
+      - "IT uses a separate contractor provisioning queue (slower: 2-3 days vs 1 day for FTE)"
+      - "Contractor Slack accounts expire after contract end date; set a calendar reminder to renew"
+    notes: >
+      Contractors often get stuck because IT defaults to the FTE Jira license.
+      If you are a contractor and Jira shows 'no active license', email
+      it-helpdesk@acmecorp.com with subject "CONTRACTOR JIRA LICENSE FIX".
+
+  fte:
+    jira_license: "JIRA-SOFTWARE"
+    github_org_team: "employees"
+    aws_account: "acmecorp-main"
+    restricted_spaces: []
+    extra_steps: []
+    notes: >
+      Standard provisioning flow. No special steps.
+
+  intern:
+    jira_license: "JIRA-SOFTWARE-EXTERNAL"
+    github_org_team: "interns"
+    aws_account: "acmecorp-sandbox"
+    restricted_spaces:
+      - /wiki/company/financials
+      - /wiki/security-runbooks
+      - /wiki/platform
+    extra_steps:
+      - "Submit intern agreement via Workday before IT provisioning starts"
+      - "AWS sandbox only — no production access under any circumstances"
+      - "All PRs require a mentor co-reviewer until intern period ends"
+    notes: >
+      Interns use the sandbox AWS account. Any request for production access
+      will be auto-rejected — this is policy, not a mistake.
