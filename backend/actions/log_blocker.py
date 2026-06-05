@@ -47,7 +47,23 @@ def _write_memory(item: MemoryItem):
         print(f"  [STUB WRITE] Blocker logged → tags={item.tags} | {item.content[:100]}")
 
 
-@tool
+def log_blocker(
+    employee_name: str,
+    blocker_description: str,
+    severity: str = "medium",
+) -> str:
+    """
+    Logs an onboarding blocker for operational tracking.
+    """
+    confirmation = (
+        f"Blocker logged for {employee_name}.\n"
+        f"Severity: {severity}\n"
+        f"Description: {blocker_description}"
+    )
+    print(f"[ACTION: log_blocker] {employee_name} — {severity} — {blocker_description[:60]}")
+    return confirmation
+
+
 def log_resolved_blocker(
     blocker: str,
     resolution: str,
