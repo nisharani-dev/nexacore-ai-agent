@@ -1,0 +1,148 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: nexacore-postgres-staging
+    environment:
+      POSTGRES_DB: nexacore_staging
+      POSTGRES_USER: nexacore
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+    ports:
+      - "5433:5432"  # Different port to avoid conflict with dev
+    volumes:
+      - postgres_data_staging:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nexacore"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - nexacore-staging
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: nexacore-redis-staging
+    ports:
+      - "6380:6379"  # Different port to avoid conflict with dev
+    volumes:
+      - redis_data_staging:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - nexacore-staging
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        BUILDKIT_INLINE_CACHE: 1
+    container_name: nexacore-backend-staging
+    environment:
+      APP_ENV: staging
+      LOG_LEVEL: INFO
+      LOG_DIR: /app/logs
+      PORT: 8000
+      
+      # Database
+      DATABASE_URL: postgresql://nexacore:${POSTGRES_PASSWORD:-changeme}@postgres:5432/nexacore_staging
+      
+      # Redis
+      REDIS_URL: redis://redis:6379/0
+      
+      # LLM
+      GROQ_API_KEY: ${GROQ_API_KEY}
+      GROQ_MODEL: ${GROQ_MODEL:-mixtral-8x7b-32768}
+      
+      # Memory
+      MEMORY_BACKEND: json
+      HINDSIGHT_API_URL: http://localhost:8001
+      
+      # Logging
+      ENABLE_STRUCTURED_LOGGING: "true"
+      
+      # Auth
+      AUTH_REQUIRED: "true"
+      APP_API_KEY: ${APP_API_KEY:-staging_key_change_me}
+      
+      # CORS
+      CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS:-http://localhost:3000,http://frontend:3000}
+      
+      # Feature flags
+      ENABLE_WEBSOCKET: "true"
+      ENABLE_REDIS: "true"
+    ports:
+      - "8001:8000"  # Different port to avoid conflict with dev
+    volumes:
+      - ./backend:/app
+      - /app/__pycache__
+      - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - nexacore-staging
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE: /api
+        VITE_SOCKET_URL: ws://backend:8000
+    container_name: nexacore-frontend-staging
+    ports:
+      - "3001:3000"  # Different port to avoid conflict with dev
+    environment:
+      VITE_API_BASE: /api
+      VITE_SOCKET_URL: ws://localhost:8001
+    volumes:
+      - ./frontend/src:/app/src
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - nexacore-staging
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:latest
+    container_name: nexacore-nginx-staging
+    ports:
+      - "8080:80"  # Public entry point
+    volumes:
+      - ./nginx.conf.staging:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - nexacore-staging
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  postgres_data_staging:
+  redis_data_staging:
+
+networks:
+  nexacore-staging:
+    driver: bridge

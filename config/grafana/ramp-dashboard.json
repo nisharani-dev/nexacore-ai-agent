@@ -1,0 +1,25 @@
+{
+  "title": "Ramp Onboarding Agent",
+  "panels": [
+    {
+      "title": "HTTP Requests",
+      "type": "stat",
+      "targets": [{ "expr": "http_requests_total" }]
+    },
+    {
+      "title": "Chat Requests",
+      "type": "stat",
+      "targets": [{ "expr": "chat_requests_total" }]
+    },
+    {
+      "title": "Memory Records",
+      "type": "gauge",
+      "targets": [{ "expr": "memory_records_total" }]
+    },
+    {
+      "title": "Request Latency (ms)",
+      "type": "graph",
+      "targets": [{ "expr": "http_request_duration_ms" }]
+    }
+  ]
+}
