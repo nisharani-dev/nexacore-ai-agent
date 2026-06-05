@@ -8,8 +8,8 @@ compatibility. All field names match the upstream dataclass definitions exactly
 so every teammate's code continues to work without changes.
 """
 
-from typing import Optional
-from pydantic import BaseModel, Field
+from typing import Any, Optional
+from pydantic import BaseModel, Field, model_validator
 
 
 # ─────────────────────────────────────────────
@@ -83,6 +83,18 @@ class AgentResponse(BaseModel):
     memories_used: list[MemoryItem] = Field(default_factory=list)
     new_memories_written: list[MemoryItem] = Field(default_factory=list)
     suggested_actions: list[str] = Field(default_factory=list)
+    tools_used: list[str] = Field(default_factory=list)
+    integrations_mode: str = "demo"
+
+
+class FeedbackRequest(BaseModel):
+    """User feedback on an agent reply."""
+    session_id: Optional[str] = None
+    message_id: Optional[str] = None
+    helpful: bool = True
+    comment: str = ""
+    team: str = ""
+    query: str = ""
 
 
 # ─────────────────────────────────────────────
@@ -97,3 +109,42 @@ class OnboardingRequest(BaseModel):
     employee_type: str = "fte"
     query: str
     session_id: Optional[str] = None
+    demo_mode: Optional[str] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce_legacy_fields(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+
+        payload = dict(data)
+        if "name" not in payload and payload.get("username"):
+            payload["name"] = payload["username"]
+        if "employee_type" not in payload and payload.get("employment_type"):
+            payload["employee_type"] = payload["employment_type"]
+        if isinstance(payload.get("employee_type"), str):
+            payload["employee_type"] = payload["employee_type"].lower()
+        return payload
+
+
+class SessionRequest(BaseModel):
+    name: str = ""
+    team: str = ""
+    role: str = ""
+    employee_type: str = "fte"
+    metadata: dict = Field(default_factory=dict)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce_legacy_fields(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+
+        payload = dict(data)
+        if "name" not in payload and payload.get("username"):
+            payload["name"] = payload["username"]
+        if "employee_type" not in payload and payload.get("employment_type"):
+            payload["employee_type"] = payload["employment_type"]
+        if isinstance(payload.get("employee_type"), str):
+            payload["employee_type"] = payload["employee_type"].lower()
+        return payload
