@@ -1,0 +1,40 @@
+version: "3.9"
+
+# ── Local development with Docker ──────────────────────────────────────────
+# Uses SQLite (no Postgres/Redis required).
+# Only needs GROQ_API_KEY in your .env file.
+#
+# Run:
+#   docker compose -f docker-compose.dev.yml up --build
+#
+# Frontend → http://localhost:3000
+# Backend  → http://localhost:8000
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    env_file:
+      - .env
+    environment:
+      APP_ENV: development
+      HINDSIGHT_BACKEND: local
+      INTEGRATIONS_MODE: demo
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        VITE_API_BASE: /api
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    restart: unless-stopped

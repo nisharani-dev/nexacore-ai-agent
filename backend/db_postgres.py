@@ -64,92 +64,103 @@ class AppDatabasePostgres:
 
     def _initialize(self) -> None:
         """Create tables and indexes on startup."""
+        statements = [
+            # Tables
+            """CREATE TABLE IF NOT EXISTS tickets (
+                id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                description TEXT NOT NULL,
+                assignee_team TEXT NOT NULL,
+                priority TEXT NOT NULL,
+                status TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )""",
+            """CREATE TABLE IF NOT EXISTS reminders (
+                id TEXT PRIMARY KEY,
+                recipient TEXT NOT NULL,
+                message TEXT NOT NULL,
+                due_in_hours INTEGER NOT NULL,
+                scheduled_for TEXT NOT NULL,
+                status TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )""",
+            """CREATE TABLE IF NOT EXISTS sessions (
+                id TEXT PRIMARY KEY,
+                user_name TEXT,
+                team_name TEXT,
+                role_title TEXT,
+                employment_type TEXT,
+                auth_subject TEXT,
+                created_at TEXT NOT NULL,
+                last_seen_at TEXT NOT NULL,
+                metadata_json TEXT NOT NULL
+            )""",
+            """CREATE TABLE IF NOT EXISTS audit_events (
+                id TEXT PRIMARY KEY,
+                event_type TEXT NOT NULL,
+                actor TEXT,
+                session_id TEXT,
+                request_id TEXT,
+                payload_json TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )""",
+            """CREATE TABLE IF NOT EXISTS memory_metadata (
+                id TEXT PRIMARY KEY,
+                namespace TEXT NOT NULL,
+                content_hash TEXT NOT NULL,
+                level TEXT NOT NULL,
+                source TEXT NOT NULL,
+                tags_json TEXT NOT NULL,
+                metadata_json TEXT NOT NULL,
+                backend_kind TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                UNIQUE(content_hash, namespace)
+            )""",
+            """CREATE TABLE IF NOT EXISTS chat_messages (
+                id TEXT PRIMARY KEY,
+                session_id TEXT NOT NULL,
+                role TEXT NOT NULL,
+                content TEXT NOT NULL,
+                metadata_json TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )""",
+            """CREATE TABLE IF NOT EXISTS feedback (
+                id TEXT PRIMARY KEY,
+                session_id TEXT,
+                message_id TEXT,
+                helpful BOOLEAN NOT NULL,
+                comment TEXT NOT NULL,
+                team TEXT NOT NULL,
+                query TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )""",
+            # Indexes
+            "CREATE INDEX IF NOT EXISTS idx_tickets_team ON tickets(assignee_team)",
+            "CREATE INDEX IF NOT EXISTS idx_tickets_status ON tickets(status)",
+            "CREATE INDEX IF NOT EXISTS idx_tickets_created_at ON tickets(created_at DESC)",
+            "CREATE INDEX IF NOT EXISTS idx_reminders_recipient ON reminders(recipient)",
+            "CREATE INDEX IF NOT EXISTS idx_reminders_status ON reminders(status)",
+            "CREATE INDEX IF NOT EXISTS idx_reminders_created_at ON reminders(created_at DESC)",
+            "CREATE INDEX IF NOT EXISTS idx_sessions_team_name ON sessions(team_name)",
+            "CREATE INDEX IF NOT EXISTS idx_sessions_created_at ON sessions(created_at DESC)",
+            "CREATE INDEX IF NOT EXISTS idx_sessions_employment_type ON sessions(employment_type)",
+            "CREATE INDEX IF NOT EXISTS idx_audit_event_type ON audit_events(event_type)",
+            "CREATE INDEX IF NOT EXISTS idx_audit_session_id ON audit_events(session_id)",
+            "CREATE INDEX IF NOT EXISTS idx_audit_created_at ON audit_events(created_at DESC)",
+            "CREATE INDEX IF NOT EXISTS idx_memory_namespace ON memory_metadata(namespace)",
+            "CREATE INDEX IF NOT EXISTS idx_memory_level ON memory_metadata(level)",
+            "CREATE INDEX IF NOT EXISTS idx_memory_source ON memory_metadata(source)",
+            "CREATE INDEX IF NOT EXISTS idx_memory_created_at ON memory_metadata(created_at DESC)",
+            "CREATE INDEX IF NOT EXISTS idx_chat_messages_session ON chat_messages(session_id)",
+            "CREATE INDEX IF NOT EXISTS idx_chat_messages_created_at ON chat_messages(created_at DESC)",
+            "CREATE INDEX IF NOT EXISTS idx_feedback_session ON feedback(session_id)",
+        ]
         with self.connect() as connection:
             cursor = connection.cursor()
-
-            # Create tables
-            cursor.executescript(
-                """
-                CREATE TABLE IF NOT EXISTS tickets (
-                    id TEXT PRIMARY KEY,
-                    title TEXT NOT NULL,
-                    description TEXT NOT NULL,
-                    assignee_team TEXT NOT NULL,
-                    priority TEXT NOT NULL,
-                    status TEXT NOT NULL,
-                    created_at TEXT NOT NULL,
-                    updated_at TEXT NOT NULL
-                );
-
-                CREATE TABLE IF NOT EXISTS reminders (
-                    id TEXT PRIMARY KEY,
-                    recipient TEXT NOT NULL,
-                    message TEXT NOT NULL,
-                    due_in_hours INTEGER NOT NULL,
-                    scheduled_for TEXT NOT NULL,
-                    status TEXT NOT NULL,
-                    created_at TEXT NOT NULL
-                );
-
-                CREATE TABLE IF NOT EXISTS sessions (
-                    id TEXT PRIMARY KEY,
-                    user_name TEXT,
-                    team_name TEXT,
-                    role_title TEXT,
-                    employment_type TEXT,
-                    auth_subject TEXT,
-                    created_at TEXT NOT NULL,
-                    last_seen_at TEXT NOT NULL,
-                    metadata_json TEXT NOT NULL
-                );
-
-                CREATE TABLE IF NOT EXISTS audit_events (
-                    id TEXT PRIMARY KEY,
-                    event_type TEXT NOT NULL,
-                    actor TEXT,
-                    session_id TEXT,
-                    request_id TEXT,
-                    payload_json TEXT NOT NULL,
-                    created_at TEXT NOT NULL
-                );
-
-                CREATE TABLE IF NOT EXISTS memory_metadata (
-                    id TEXT PRIMARY KEY,
-                    namespace TEXT NOT NULL,
-                    content_hash TEXT NOT NULL,
-                    level TEXT NOT NULL,
-                    source TEXT NOT NULL,
-                    tags_json TEXT NOT NULL,
-                    metadata_json TEXT NOT NULL,
-                    backend_kind TEXT NOT NULL,
-                    created_at TEXT NOT NULL,
-                    updated_at TEXT NOT NULL,
-                    UNIQUE(content_hash, namespace)
-                );
-
-                -- Create indexes
-                CREATE INDEX IF NOT EXISTS idx_tickets_team ON tickets(assignee_team);
-                CREATE INDEX IF NOT EXISTS idx_tickets_status ON tickets(status);
-                CREATE INDEX IF NOT EXISTS idx_tickets_created_at ON tickets(created_at DESC);
-
-                CREATE INDEX IF NOT EXISTS idx_reminders_recipient ON reminders(recipient);
-                CREATE INDEX IF NOT EXISTS idx_reminders_status ON reminders(status);
-                CREATE INDEX IF NOT EXISTS idx_reminders_created_at ON reminders(created_at DESC);
-
-                CREATE INDEX IF NOT EXISTS idx_sessions_team_name ON sessions(team_name);
-                CREATE INDEX IF NOT EXISTS idx_sessions_created_at ON sessions(created_at DESC);
-                CREATE INDEX IF NOT EXISTS idx_sessions_employment_type ON sessions(employment_type);
-
-                CREATE INDEX IF NOT EXISTS idx_audit_event_type ON audit_events(event_type);
-                CREATE INDEX IF NOT EXISTS idx_audit_session_id ON audit_events(session_id);
-                CREATE INDEX IF NOT EXISTS idx_audit_created_at ON audit_events(created_at DESC);
-
-                CREATE INDEX IF NOT EXISTS idx_memory_namespace ON memory_metadata(namespace);
-                CREATE INDEX IF NOT EXISTS idx_memory_level ON memory_metadata(level);
-                CREATE INDEX IF NOT EXISTS idx_memory_source ON memory_metadata(source);
-                CREATE INDEX IF NOT EXISTS idx_memory_created_at ON memory_metadata(created_at DESC);
-                """
-            )
+            for stmt in statements:
+                cursor.execute(stmt)
             cursor.close()
 
     def healthcheck(self) -> dict[str, Any]:
@@ -499,3 +510,75 @@ class AppDatabasePostgres:
                 (status, now, ticket_id),
             )
             cursor.close()
+
+    def insert_chat_message(
+        self,
+        *,
+        session_id: str,
+        role: str,
+        content: str,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        message_id = str(uuid4())
+        created_at = utc_now_iso()
+        with self.connect() as connection:
+            cursor = connection.cursor()
+            cursor.execute(
+                """
+                INSERT INTO chat_messages (id, session_id, role, content, metadata_json, created_at)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                """,
+                (message_id, session_id, role, content, json.dumps(metadata or {}, ensure_ascii=True), created_at),
+            )
+            cursor.close()
+        return {"id": message_id, "session_id": session_id, "role": role, "content": content, "created_at": created_at}
+
+    def list_chat_messages(self, session_id: str, *, limit: int = 100) -> list[dict[str, Any]]:
+        with self.connect() as connection:
+            cursor = connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            cursor.execute(
+                "SELECT * FROM chat_messages WHERE session_id = %s ORDER BY created_at ASC LIMIT %s",
+                (session_id, limit),
+            )
+            rows = cursor.fetchall()
+            cursor.close()
+        messages = []
+        for row in rows:
+            msg = dict(row)
+            msg["metadata"] = json.loads(msg.pop("metadata_json"))
+            messages.append(msg)
+        return messages
+
+    def insert_feedback(
+        self,
+        *,
+        session_id: str = "",
+        message_id: str = "",
+        helpful: bool,
+        comment: str = "",
+        team: str = "",
+        query: str = "",
+    ) -> dict[str, Any]:
+        feedback_id = str(uuid4())
+        created_at = utc_now_iso()
+        with self.connect() as connection:
+            cursor = connection.cursor()
+            cursor.execute(
+                """
+                INSERT INTO feedback (id, session_id, message_id, helpful, comment, team, query, created_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                """,
+                (feedback_id, session_id, message_id, helpful, comment, team, query, created_at),
+            )
+            cursor.close()
+        return {"id": feedback_id, "helpful": helpful, "created_at": created_at}
+
+    def feedback_summary(self) -> dict[str, Any]:
+        with self.connect() as connection:
+            cursor = connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            cursor.execute("SELECT COUNT(*) as total FROM feedback")
+            total = cursor.fetchone()["total"]
+            cursor.execute("SELECT COUNT(*) as count FROM feedback WHERE helpful = true")
+            helpful = cursor.fetchone()["count"]
+            cursor.close()
+        return {"total": total, "helpful": helpful, "unhelpful": total - helpful}
