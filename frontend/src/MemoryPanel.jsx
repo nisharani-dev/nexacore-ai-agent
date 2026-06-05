@@ -6,28 +6,28 @@
 // ---------------------------------------------------------------------------
 
 const SCOPE_META = {
-  company: { label: "company-wide",    color: "scope--company" },
-  org:     { label: "engineering org", color: "scope--org"     },
-  team:    { label: "team-specific",   color: "scope--team"    },
-  role:    { label: "role-specific",   color: "scope--role"    },
+  company: { label: "company-wide" },
+  org:     { label: "engineering org" },
+  team:    { label: "team-specific" },
+  role:    { label: "role-specific" },
 };
 
 const TYPE_META = {
-  access:    { label: "access",    dot: "dot--teal"   },
-  blocker:   { label: "blocker",   dot: "dot--red"    },
-  exception: { label: "exception", dot: "dot--amber"  },
-  ritual:    { label: "ritual",    dot: "dot--green"  },
+  access:    { label: "access",    dot: "ldot--access"    },
+  blocker:   { label: "blocker",   dot: "ldot--blocker"   },
+  exception: { label: "exception", dot: "ldot--exception" },
+  ritual:    { label: "ritual",    dot: "ldot--ritual"    },
 };
 
 function MemoryEntry({ entry, isNew }) {
-  const type = TYPE_META[entry.type] ?? { label: entry.type, dot: "dot--gray" };
+  const type = TYPE_META[entry.type] ?? { label: entry.type, dot: "" };
   return (
-    <div className={`mem-entry ${isNew ? "mem-entry--new" : ""}`}>
-      <div className="mem-entry-top">
-        <span className={`mem-dot ${type.dot}`} aria-hidden="true" />
-        <span className="mem-type">{type.label}</span>
+    <div className={`mem-card ${isNew ? "mem-card--new" : ""}`}>
+      <div className="mem-card-type">
+        <span className={`mem-type-dot mem-type-dot--${entry.type}`} aria-hidden="true" />
+        <span className="mem-type-label">{type.label}</span>
       </div>
-      <p className="mem-text">{entry.text}</p>
+      <p className="mem-card-text">{entry.text}</p>
     </div>
   );
 }
@@ -44,35 +44,34 @@ export default function MemoryPanel({ memories, personaLabel, newMemoryIds }) {
 
   return (
     <aside className="mem-panel" aria-label="Agent memory panel">
-      <div className="mem-panel-header">
-        <div className="mem-panel-title">
-          <span className="mem-title-text">memory</span>
-          <span className="mem-persona-tag">{personaLabel}</span>
-        </div>
-        <div className="mem-stat">
-          <span className="mem-count">{total}</span>
-          <span className="mem-count-label">entries</span>
+      <div className="mem-header">
+        <div className="mem-header-top">
+          <div>
+            <div className="mem-title">memory</div>
+            <div className="mem-big-num">{total}</div>
+            <div className="mem-num-label">entries</div>
+          </div>
+          <span className="mem-persona-badge">{personaLabel}</span>
         </div>
 
-        {/* type legend */}
         <div className="mem-legend">
           {Object.entries(TYPE_META).map(([k, v]) => (
-            <div key={k} className="legend-row">
-              <span className={`mem-dot ${v.dot}`} aria-hidden="true" />
+            <div key={k} className="legend-item">
+              <span className={`ldot ${v.dot}`} aria-hidden="true" />
               <span>{v.label}</span>
             </div>
           ))}
         </div>
       </div>
 
-      <div className="mem-panel-body">
+      <div className="mem-body">
         {scopes.map((sc) => {
           const entries = grouped[sc];
           if (!entries.length) return null;
           const meta = SCOPE_META[sc];
           return (
             <div key={sc} className="mem-group">
-              <div className={`mem-scope-label ${meta.color}`}>
+              <div className={`mem-scope mem-scope--${sc}`}>
                 {meta.label}
               </div>
               {entries.map((entry, i) => (

@@ -1,0 +1,22 @@
+[
+  {
+    "title": "Platform Onboarding Notes",
+    "tag": "team:platform",
+    "level": "team",
+    "items": [
+      "Platform onboarding doc is outdated; verify Terraform and ArgoCD steps with the latest runbook.",
+      "Request Terraform Cloud and ArgoCD in the same access thread to avoid duplicate approvals.",
+      "Join #platform-team and #deployments before your first production-readiness walkthrough."
+    ]
+  },
+  {
+    "title": "Infra Security Runbook",
+    "tag": "team:infra_security",
+    "level": "sub_team",
+    "items": [
+      "Vault access depends on compliance training completion before Security will approve the ticket.",
+      "Snyk access only appears after the infra_security Jira project membership is added.",
+      "Security-runbooks space is restricted for contractors; request a redacted excerpt when needed."
+    ]
+  }
+]

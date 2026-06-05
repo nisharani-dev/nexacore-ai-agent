@@ -116,6 +116,34 @@ export const MOCK_PERSONAS = {
   },
 };
 
+// Team-specific memory overrides for multi-team demo
+const TEAM_MEMORY_OVERRIDES = {
+  fp_and_a: {
+    person1: [
+      { scope: "company", type: "access", text: "VPN + Okta required Day 1" },
+      { scope: "org", type: "access", text: "NetSuite license via IT portal" },
+    ],
+    person10: [
+      { scope: "company", type: "access", text: "VPN + Okta required Day 1" },
+      { scope: "team", type: "access", text: "Anaplan model access: request FP&A workspace + sandbox" },
+      { scope: "team", type: "blocker", text: "Pigment license takes 4 days — request on Day 1" },
+      { scope: "team", type: "ritual", text: "Monthly close office hours: Tuesdays 2pm #fpna-close" },
+    ],
+  },
+  data_platform: {
+    person10: [
+      { scope: "team", type: "access", text: "Databricks workspace: data-platform-prod + sandbox" },
+      { scope: "team", type: "blocker", text: "Airflow DAG deploy access needs platform lead approval" },
+    ],
+  },
+};
+
+export function getPersonaMemories(personaMode, team) {
+  const base = MOCK_PERSONAS[personaMode]?.memories ?? [];
+  const override = TEAM_MEMORY_OVERRIDES[team]?.[personaMode];
+  return override ? [...base.slice(0, 2), ...override] : base;
+}
+
 // classify user input into a response key
 export function classifyMessage(text) {
   const t = text.toLowerCase();

@@ -34,14 +34,19 @@ from typing import Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from interfaces import UserProfile, TeamPath, MemoryItem, ContextBlock
-from context.team_resolver import TeamResolver, _TeamNode
-from context.exception_tagger import ExceptionTagger
+try:
+    from backend.interfaces import UserProfile, TeamPath, MemoryItem, ContextBlock, OnboardingRequest
+    from backend.context.team_resolver import TeamResolver, _TeamNode
+    from backend.context.exception_tagger import ExceptionTagger
+except ImportError:
+    from interfaces import UserProfile, TeamPath, MemoryItem, ContextBlock, OnboardingRequest  # type: ignore
+    from context.team_resolver import TeamResolver, _TeamNode  # type: ignore
+    from context.exception_tagger import ExceptionTagger  # type: ignore
 
 
 # ── Stub for P2's retriever (used until memory/ module is ready) ──────────────
 
-def _stub_fetch_memories(tags: list[str]) -> list[MemoryItem]:
+def _stub_fetch_memories(tags: list[str], query: str = "") -> list[MemoryItem]:
     """
     STUB — replace with real Hindsight call once P2 ships retriever.py.
 
@@ -56,9 +61,12 @@ def _stub_fetch_memories(tags: list[str]) -> list[MemoryItem]:
 # ── Try to import P2's real retriever; fall back to stub ─────────────────────
 
 try:
-    from memory.retriever import fetch_memories as _fetch_memories  # type: ignore
+    from backend.memory.retriever import fetch_memories as _fetch_memories  # type: ignore
 except ImportError:
-    _fetch_memories = _stub_fetch_memories
+    try:
+        from memory.retriever import fetch_memories as _fetch_memories  # type: ignore
+    except ImportError:
+        _fetch_memories = _stub_fetch_memories
 
 
 # ── Context Builder ───────────────────────────────────────────────────────────
@@ -73,7 +81,7 @@ class ContextBuilder:
         self._resolver = TeamResolver()
         self._tagger = ExceptionTagger()
 
-    def build(self, user: UserProfile) -> ContextBlock:
+    def build(self, user: UserProfile, query: str = "") -> ContextBlock:
         """
         Main entry point. Returns a ContextBlock.
 
@@ -92,7 +100,7 @@ class ContextBuilder:
         tags = self._build_tags(team_path, user.employment_type)
 
         # 3. Fetch memories from Hindsight (P2's domain)
-        memories = _fetch_memories(tags)
+        memories = _fetch_memories(tags, query=query)
 
         # 4. Exception profile
         exception_profile = self._tagger.tag(user.employment_type)
@@ -186,6 +194,18 @@ class ContextBuilder:
         return merged
 
 
+async def build_context(request: OnboardingRequest) -> ContextBlock:
+    user = UserProfile(
+        name=request.name,
+        team_name=request.team,
+        employment_type=request.employee_type,
+        role_title=request.role or None,
+    )
+
+    builder = ContextBuilder()
+    return builder.build(user, query=request.query)
+
+
 # ── CLI ───────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
@@ -207,7 +227,7 @@ if __name__ == "__main__":
 
     print(f"\nTeam path:  {ctx.team_path}")
     print(f"\nMemory tags fetched: {builder.get_tags_for_user(user)}")
-    print(f"Memories retrieved: {len(ctx.memories)} (stub returns 0 until P2 is ready)")
+    print(f"Memories retrieved: {len(ctx.memories)}")
 
     print(f"\nException notes ({len(ctx.exception_notes)} lines):")
     for line in ctx.exception_notes:

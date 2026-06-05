@@ -27,8 +27,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from ingestion.confluence_ingest import ingest_confluence
-from ingestion.gdocs_ingest import ingest_gdocs
+try:
+    from backend.ingestion.confluence_ingest import ingest_confluence
+    from backend.ingestion.gdocs_ingest import ingest_gdocs
+except ImportError:
+    from ingestion.confluence_ingest import ingest_confluence  # type: ignore
+    from ingestion.gdocs_ingest import ingest_gdocs  # type: ignore
 
 
 def run_all(dry_run: bool = False, source: str = "all") -> dict:

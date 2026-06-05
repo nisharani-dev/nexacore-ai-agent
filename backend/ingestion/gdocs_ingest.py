@@ -21,7 +21,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from interfaces import MemoryItem
+from backend.interfaces import MemoryItem
 
 MOCK_DATA_PATH = Path(__file__).resolve().parents[2] / "mock_data" / "gdocs_pages.json"
 
@@ -35,7 +35,7 @@ def _write_memory(item: MemoryItem, dry_run: bool = False):
         return
 
     try:
-        from memory.hindsight_client import HindsightClient  # type: ignore
+        from backend.memory.hindsight_client import HindsightClient
         client = HindsightClient()
         client.write(item)
     except ImportError:
@@ -65,7 +65,7 @@ def ingest_gdocs(mock_path: Path = MOCK_DATA_PATH, dry_run: bool = False) -> lis
         for item_text in page["items"]:
             memory = MemoryItem(
                 content=item_text,
-                tags=[page["tag"], "org:company"],
+                tags=[page["tag"], "org:company", "seed:gdocs"],
                 level=page["level"],
                 source="gdocs_ingestion",
                 relevance_score=1.0,

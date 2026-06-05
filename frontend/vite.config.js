@@ -3,12 +3,23 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
+  test: {
+    environment: "jsdom",
+    globals: true,
+    setupFiles: "./vitest.setup.js",
+  },
   server: {
     port: 5173,
     proxy: {
-      // Proxy /chat and /memories to Person 1's backend when USE_MOCK=false
-      "/chat":     "http://localhost:8000",
-      "/memories": "http://localhost:8000",
+      "/api": {
+        target: "http://localhost:8000",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, ""),
+      },
+      "/ws": {
+        target: "ws://localhost:8000",
+        ws: true,
+      },
     },
   },
 });

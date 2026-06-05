@@ -63,7 +63,7 @@ def build_system_prompt() -> str:
     return SYSTEM_PROMPT
 
 
-def build_human_prompt(ctx: ContextBlock) -> str:
+def build_human_prompt(ctx: ContextBlock, user_query: str) -> str:
     user = ctx.user
     hierarchy_str = str(ctx.team_path) if ctx.team_path.names else user.team_name
     memories_str = _format_memories(ctx.memories)
@@ -85,7 +85,7 @@ The following memories were retrieved from institutional knowledge relevant to t
 {memories_str}
 
 ## Employee's Question
-{ctx.user.name} asks: (see query below)
+{ctx.user.name} asks: {user_query}
 
 ## Your Task
 Using the employee profile, exception flags, and retrieved memories above, provide personalized, \

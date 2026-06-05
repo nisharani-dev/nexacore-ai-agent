@@ -22,6 +22,17 @@ from interfaces import TeamPath
 
 # ── Config path ─────────────────────────────────────────────────────────────
 TEAMS_YAML = Path(__file__).resolve().parents[2] / "config" / "teams.yaml"
+TEAM_ALIASES = {
+    "platformeng": "platform",
+    "platformengineering": "platform",
+    "infrasec": "infra_security",
+    "infrasecurityteam": "infra_security",
+    "platformsecurity": "infra_security",
+    "dataeng": "data_platform",
+    "dataengineering": "data_platform",
+    "financeops": "fp_and_a",
+    "fpa": "fp_and_a",
+}
 
 
 # ── Internal tree node ────────────────────────────────────────────────────────
@@ -155,7 +166,8 @@ class TeamResolver:
     @staticmethod
     def _normalise(s: str) -> str:
         """Lowercase + remove spaces, underscores, hyphens."""
-        return s.lower().replace(" ", "").replace("_", "").replace("-", "")
+        normalized = s.lower().replace(" ", "").replace("_", "").replace("-", "")
+        return TEAM_ALIASES.get(normalized, normalized)
 
     def _suggest(self, normalised_query: str) -> list[str]:
         """Return up to 3 closest key names for helpful error messages."""

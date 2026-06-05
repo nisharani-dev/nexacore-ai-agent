@@ -2,15 +2,12 @@
 
 > An AI-powered onboarding assistant that learns from every employee's experience and guides the next one smarter.
 
----
-
-## What is Ramp?
-
-Onboarding knowledge lives in scattered docs, Slack threads, and tribal knowledge. Every new employee hits the same blockers, asks the same questions, and waits on the same tickets.
-
-Ramp fixes that.
-
-It uses **Hindsight Memory** — a hierarchical memory system that captures real onboarding experiences and surfaces them to the next person joining the same team. The more people onboard, the smarter it gets.
+Cloud-ready onboarding assistant with:
+- Groq-backed conversational agent
+- Hierarchical team context resolution
+- Memory retrieval and writeback
+- Demo memory flywheel (`person #1` vs `person #10`)
+- Operational actions for tickets, reminders, and blocker logging
 
 ---
 
@@ -37,55 +34,61 @@ New Employee Query
 
 ### Hierarchical Memory
 
-Every memory is tagged to a level in the org hierarchy:
-
 ```
 Company → Engineering → Platform Team → Infrastructure Security
 ```
 
-A new joiner in Infrastructure Security inherits memories from all four levels — plus any exception memories for their role type (contractor, intern, full-time).
+A new joiner inherits memories from all levels — plus exception memories for their role type (contractor, intern, full-time).
 
 ---
 
-## Project Structure
+## Local Run
 
+Backend:
+
+```bash
+python3 -m backend.main
 ```
-backend/
-├── agent/
-│   ├── agent.py           # AI orchestrator — central workflow controller
-│   ├── prompt_builder.py  # system + human prompt construction
-│   └── tools.py           # LangChain tool registry (raise_ticket, send_reminder, log_blocker)
-├── context/
-│   ├── context_builder.py # assembles full context for the agent
-│   ├── team_resolver.py   # resolves team hierarchy from teams.yaml
-│   └── exception_tagger.py# detects contractor / intern / special case flags
-├── memory/
-│   ├── hindsight_client.py# Hindsight Memory read/write client
-│   ├── retriever.py       # semantic memory retrieval across hierarchy
-│   └── writer.py          # writes new memories post-interaction
-├── actions/
-│   ├── raise_ticket.py    # raises IT / access tickets
-│   ├── send_reminder.py   # sends reminders to people/teams
-│   └── log_blocker.py     # logs onboarding blockers
-├── ingestion/
-│   ├── confluence_ingest.py
-│   ├── gdocs_ingest.py
-│   └── ingest_runner.py
-├── interfaces.py          # shared data contracts for all modules
-├── server.py              # FastAPI app
-└── main.py                # entry point
 
-frontend/
-├── src/
-│   ├── App.jsx
-│   ├── ChatWindow.jsx
-│   ├── MemoryPanel.jsx
-│   ├── MessageInput.jsx
-│   └── api.js
+Frontend:
 
-config/
-└── teams.yaml             # org hierarchy definition
+```bash
+cd frontend
+npm ci
+npm run dev
 ```
+
+Copy `.env.example` to `.env` and fill in at least `GROQ_API_KEY`.
+
+---
+
+## Production Run
+
+```bash
+docker compose -f docker-compose.prod.yml up --build
+```
+
+Services:
+- frontend: `http://localhost:3000`
+- backend: `http://localhost:8000`
+
+---
+
+## Environment
+
+| Variable | Description |
+|---|---|
+| `GROQ_API_KEY` | Required |
+| `GROQ_MODEL` | Defaults to `llama3-70b-8192` |
+| `DATA_DIR` | Writable storage for cloud volumes |
+| `APP_DB_PATH` | SQLite operational database path |
+| `AUTH_REQUIRED` | Enable API-key auth for protected endpoints |
+| `APP_API_KEY` | Shared secret for server-to-server calls |
+| `HINDSIGHT_STORE_PATH` | Memory persistence file path |
+| `REMINDER_STORE_PATH` | Reminder persistence file path |
+| `TICKET_STORE_PATH` | Ticket persistence file path |
+| `HINDSIGHT_BACKEND` | `local` or `http` |
+| `HINDSIGHT_BASE_URL` | Required for HTTP-backed Hindsight adapter |
 
 ---
 
@@ -112,41 +115,73 @@ config/
 }
 ```
 
-### `GET /health`
+### Operational Endpoints
 
-```json
-{ "status": "ok", "service": "ramp-agent" }
+- `GET /health`
+- `GET /ready`
+- `GET /metrics`
+- `GET /analytics/summary`
+- `POST /sessions`
+- `GET /sessions/{session_id}`
+- `GET /sessions/{session_id}/messages`
+- `GET /memory/summary`
+- `GET /tickets`
+- `GET /reminders`
+- `GET /audit`
+- `POST /feedback`
+- `POST /demo/reset`
+- `POST /chat/stream` (SSE)
+- `WS /ws?session_id=...`
+
+---
+
+## Project Structure
+
+```
+backend/
+├── agent/
+│   ├── agent.py           # AI orchestrator — central workflow controller
+│   ├── prompt_builder.py  # system + human prompt construction
+│   └── tools.py           # LangChain tool registry
+├── context/
+│   ├── context_builder.py
+│   ├── team_resolver.py
+│   └── exception_tagger.py
+├── memory/
+│   ├── hindsight_client.py
+│   ├── retriever.py
+│   └── writer.py
+├── actions/
+│   ├── raise_ticket.py
+│   ├── send_reminder.py
+│   └── log_blocker.py
+├── ingestion/
+│   ├── confluence_ingest.py
+│   ├── gdocs_ingest.py
+│   └── ingest_runner.py
+├── interfaces.py          # shared data contracts
+├── server.py              # FastAPI app
+└── main.py                # entry point
+
+config/
+└── teams.yaml             # org hierarchy definition
 ```
 
 ---
 
-## Setup
+## Cloud Deployment Notes
 
-### Prerequisites
+1. Deploy backend as a containerized web service.
+2. Mount persistent storage to `/app/data` or override store paths explicitly.
+3. Serve frontend behind a reverse proxy that forwards `/api/*` to the backend.
+4. Set `VITE_API_BASE=/api` for same-origin browser requests.
 
-- Python 3.11+
-- A [Groq API key](https://console.groq.com)
-
-### Install
-
-```bash
-pip install -r backend/requirements.txt
-```
-
-### Configure
-
-```bash
-cp .env.example .env
-# Add your GROQ_API_KEY to .env
-```
-
-### Run
-
-```bash
-python -m backend.main
-# or
-uvicorn backend.server:app --reload --port 8000
-```
+Recommended next upgrades:
+1. Move SQLite to managed Postgres for multi-instance deployments.
+2. Add authentication for employee identity and role-aware authorization.
+3. Add tracing, metrics, and request correlation IDs.
+4. Replace mock ticket/reminder implementations with Jira/ServiceNow integrations.
+5. Replace local Hindsight fallback with the real managed Hindsight service.
 
 ---
 
@@ -167,7 +202,7 @@ uvicorn backend.server:app --reload --port 8000
 - **LLM**: Groq (llama3-70b-8192)
 - **Agent Framework**: LangChain + LangGraph
 - **API**: FastAPI + Uvicorn
-- **Memory**: Hindsight Memory (custom)
+- **Memory**: Hindsight Memory
 - **Frontend**: React + Vite
 
 ---

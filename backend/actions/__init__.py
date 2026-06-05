@@ -10,8 +10,13 @@ Person 1 does:
 That's it. Person 1 doesn't need to know which file each tool lives in.
 """
 
-from actions.raise_ticket import raise_it_ticket
-from actions.send_reminder import send_reminder
-from actions.log_blocker import log_resolved_blocker
+try:
+    from .raise_ticket import raise_it_ticket, raise_ticket
+    from .send_reminder import send_reminder
+    from .log_blocker import log_blocker, log_resolved_blocker
+except ImportError:
+    from actions.raise_ticket import raise_it_ticket, raise_ticket  # type: ignore
+    from actions.send_reminder import send_reminder  # type: ignore
+    from actions.log_blocker import log_blocker, log_resolved_blocker  # type: ignore
 
-ALL_TOOLS = [raise_it_ticket, send_reminder, log_resolved_blocker]
+ALL_TOOLS = [raise_it_ticket, raise_ticket, send_reminder, log_blocker, log_resolved_blocker]

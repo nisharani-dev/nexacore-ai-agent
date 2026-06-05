@@ -1,0 +1,22 @@
+[
+  {
+    "title": "Engineering Shared Access FAQ",
+    "tag": "org:engineering",
+    "level": "division",
+    "items": [
+      "AWS baseline access requests go to CloudOps via #it-aws-access rather than the generic helpdesk queue.",
+      "GitHub org access auto-provisions only when the employee email matches the linked GitHub account.",
+      "Badge pickup after 5 PM often fails; schedule reception collection during business hours."
+    ]
+  },
+  {
+    "title": "Contractor Exception Notes",
+    "tag": "exception:contractor",
+    "level": "exception",
+    "items": [
+      "Contractors need the external Jira license and often require a manual correction from IT.",
+      "Contractor provisioning runs through a slower queue; communicate that delay proactively.",
+      "Vault requests for contractors require both NDA completion and compliance training confirmation."
+    ]
+  }
+]

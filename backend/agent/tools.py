@@ -15,9 +15,8 @@ Adding a new tool:
 
 from langchain_core.tools import tool
 
-# ── Lazy imports from Person 4's action layer ──────────────────────────────
-# Using try/except so the agent still loads even if actions aren't implemented yet.
-# Replace stubs with real imports as Person 4 delivers them.
+# ── Action layer imports ───────────────────────────────────────────────────
+# Lazy try/except keeps the agent loadable if an action module is missing.
 
 try:
     from backend.actions.raise_ticket import raise_ticket as _raise_ticket_action

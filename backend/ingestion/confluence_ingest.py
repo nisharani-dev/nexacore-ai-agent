@@ -30,7 +30,7 @@ from pathlib import Path
 # Allow imports from backend/ root
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from interfaces import MemoryItem
+from backend.interfaces import MemoryItem
 
 # ── Path to mock data ─────────────────────────────────────────────────────────
 MOCK_DATA_PATH = Path(__file__).resolve().parents[2] / "mock_data" / "confluence_pages.json"
@@ -55,7 +55,7 @@ def _write_memory(item: MemoryItem, dry_run: bool = False):
 
     # ── Real call goes here once P2 is ready ──────────────────────────────────
     try:
-        from memory.hindsight_client import HindsightClient  # type: ignore
+        from backend.memory.hindsight_client import HindsightClient
         client = HindsightClient()
         client.write(item)
     except ImportError:
@@ -86,7 +86,7 @@ def ingest_confluence(mock_path: Path = MOCK_DATA_PATH, dry_run: bool = False) -
         for item_text in page["items"]:
             memory = MemoryItem(
                 content=item_text,
-                tags=[page["tag"], "org:company"],  # always include company tag too
+                tags=[page["tag"], "org:company", "seed:confluence"],
                 level=page["level"],
                 source="confluence_ingestion",
                 relevance_score=1.0,               # ingested data = high relevance baseline

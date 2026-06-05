@@ -4,8 +4,13 @@
 #   from context.team_resolver import TeamResolver       ← internal / CLI
 #   from context.exception_tagger import ExceptionTagger ← internal / CLI
 
-from context.context_builder import ContextBuilder
-from context.team_resolver import TeamResolver
-from context.exception_tagger import ExceptionTagger, ExceptionProfile
+try:
+    from .context_builder import ContextBuilder
+    from .team_resolver import TeamResolver
+    from .exception_tagger import ExceptionTagger, ExceptionProfile
+except ImportError:
+    from context.context_builder import ContextBuilder  # type: ignore
+    from context.team_resolver import TeamResolver  # type: ignore
+    from context.exception_tagger import ExceptionTagger, ExceptionProfile  # type: ignore
 
 __all__ = ["ContextBuilder", "TeamResolver", "ExceptionTagger", "ExceptionProfile"]
