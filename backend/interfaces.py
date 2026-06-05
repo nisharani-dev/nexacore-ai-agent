@@ -3,18 +3,17 @@ interfaces.py — Shared contracts for the Ramp project.
 P1 owns this file. Everyone imports from here.
 Do NOT import from individual modules directly across boundaries.
 
-Merge note: upstream used dataclasses; P1 uses Pydantic for FastAPI compatibility.
-All field names match the upstream dataclass definitions exactly so every
-teammate's code continues to work without changes.
+Note: upstream used dataclasses; P1 uses Pydantic for FastAPI response_model
+compatibility. All field names match the upstream dataclass definitions exactly
+so every teammate's code continues to work without changes.
 """
 
-from typing import Any, Optional
+from typing import Optional
 from pydantic import BaseModel, Field
 
 
 # ─────────────────────────────────────────────
 # UserProfile
-# Matches upstream: name, team_name, employment_type, role_title, manager_name
 # ─────────────────────────────────────────────
 
 class UserProfile(BaseModel):
@@ -28,7 +27,6 @@ class UserProfile(BaseModel):
 
 # ─────────────────────────────────────────────
 # TeamPath
-# Matches upstream: ids, names
 # ─────────────────────────────────────────────
 
 class TeamPath(BaseModel):
@@ -47,7 +45,6 @@ class TeamPath(BaseModel):
 
 # ─────────────────────────────────────────────
 # MemoryItem
-# Matches upstream: content, tags, level, source, relevance_score
 # ─────────────────────────────────────────────
 
 class MemoryItem(BaseModel):
@@ -61,7 +58,6 @@ class MemoryItem(BaseModel):
 
 # ─────────────────────────────────────────────
 # ContextBlock
-# Matches upstream: user, team_path, memories, exception_notes, raw_accesses
 # ─────────────────────────────────────────────
 
 class ContextBlock(BaseModel):
@@ -74,12 +70,11 @@ class ContextBlock(BaseModel):
     team_path: TeamPath
     memories: list[MemoryItem] = Field(default_factory=list)
     exception_notes: list[str] = Field(default_factory=list)
-    raw_accesses: list[str] = Field(default_factory=list)   # merged access list, all levels
+    raw_accesses: list[str] = Field(default_factory=list)
 
 
 # ─────────────────────────────────────────────
 # AgentResponse
-# Matches upstream: message, memories_used, new_memories_written, suggested_actions
 # ─────────────────────────────────────────────
 
 class AgentResponse(BaseModel):
@@ -91,7 +86,7 @@ class AgentResponse(BaseModel):
 
 
 # ─────────────────────────────────────────────
-# OnboardingRequest — FastAPI inbound request schema (P1 + P5)
+# OnboardingRequest — FastAPI inbound (P1 + P5)
 # ─────────────────────────────────────────────
 
 class OnboardingRequest(BaseModel):
