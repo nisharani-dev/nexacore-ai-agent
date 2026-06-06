@@ -234,10 +234,25 @@ class HindsightHttpMemoryStore(BaseMemoryStore):
         return response
 
     def healthcheck(self) -> dict[str, Any]:
+        """Check if the Hindsight API is reachable and responding."""
         try:
-            response = self._request("GET", self.health_path)
+            response = self._request("GET", self.health_path, timeout=5)
             payload = response.json() if response.content else {"status": "ok"}
             return {"status": "ok", "backend": "http", "details": payload}
+        except requests.exceptions.HTTPError as exc:
+            # If health endpoint doesn't exist (404), try a simple search
+            if exc.response is not None and exc.response.status_code == 404:
+                try:
+                    # Try minimal search instead
+                    response = self._request("POST", self.search_path, json={
+                        "tags": [],
+                        "query": "",
+                        "limit": 1
+                    }, timeout=5)
+                    return {"status": "ok", "backend": "http", "details": {"via": "search"}}
+                except Exception as search_exc:
+                    return {"status": "degraded", "backend": "http", "error": f"Health check failed: {exc}, Search also failed: {search_exc}"}
+            return {"status": "degraded", "backend": "http", "error": str(exc)}
         except Exception as exc:
             return {"status": "degraded", "backend": "http", "error": str(exc)}
 
@@ -300,9 +315,36 @@ class HindsightHttpMemoryStore(BaseMemoryStore):
             raise
 
     def count_records(self) -> int:
-        response = self._request("GET", self.search_path)
-        data = response.json()
-        return int(data.get("count", 0))
+        """Count total records by doing an empty search with limit=1."""
+        try:
+            # Try POST with empty search (most APIs support this)
+            response = self._request("POST", self.search_path, json={
+                "tags": [],
+                "query": "",
+                "limit": 1,
+                "namespace": None
+            })
+            data = response.json()
+            # Check if response includes total count
+            if "total" in data:
+                return int(data["total"])
+            if "count" in data:
+                return int(data["count"])
+            # If no count field, return length of records
+            records = data.get("records", data if isinstance(data, list) else [])
+            return len(records) if records else 0
+        except requests.HTTPError as exc:
+            # If POST fails, try GET as fallback
+            if exc.response is not None and exc.response.status_code == 405:
+                try:
+                    response = self._request("GET", self.search_path)
+                    data = response.json()
+                    return int(data.get("count", 0))
+                except Exception:
+                    logger.warning("Unable to count records from Hindsight API, assuming 0")
+                    return 0
+            logger.warning("Unable to count records from Hindsight API: %s", exc)
+            return 0
 
     def _headers(self) -> dict[str, str]:
         return {
@@ -325,7 +367,24 @@ class HindsightClient:
             api_key = os.getenv("HINDSIGHT_API_KEY", "").strip()
             if base_url and api_key:
                 logger.info("Using HTTP Hindsight backend: %s", base_url)
-                self._store: BaseMemoryStore = HindsightHttpMemoryStore()
+                try:
+                    self._store: BaseMemoryStore = HindsightHttpMemoryStore()
+                    # Test connectivity
+                    health = self._store.healthcheck()
+                    if health.get("status") != "ok":
+                        logger.warning(
+                            "Hindsight HTTP backend health check failed: %s - falling back to local",
+                            health
+                        )
+                        self.backend_kind = "local"
+                        self._store = LocalJsonMemoryStore(store_path=store_path)
+                except Exception as e:
+                    logger.warning(
+                        "Failed to initialize Hindsight HTTP backend: %s - falling back to local",
+                        e
+                    )
+                    self.backend_kind = "local"
+                    self._store = LocalJsonMemoryStore(store_path=store_path)
             else:
                 logger.warning(
                     "HINDSIGHT_BACKEND=http but HINDSIGHT_BASE_URL or HINDSIGHT_API_KEY "

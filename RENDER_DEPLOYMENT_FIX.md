@@ -30,10 +30,23 @@ FRONTEND_URL=https://nexacore-frontend.onrender.com
 # Auth (currently disabled, can enable later)
 AUTH_REQUIRED=false
 
-# Memory Backend - Use local for production (file-based)
+# Memory Backend - Choose ONE option:
+
+## Option A: Local File-Based Storage (Recommended for now)
 HINDSIGHT_BACKEND=local
 HINDSIGHT_PROJECT=ramp-onboarding-demo
-# NOTE: Do NOT set HINDSIGHT_BASE_URL or HINDSIGHT_API_KEY for local mode
+# Do NOT set HINDSIGHT_BASE_URL or HINDSIGHT_API_KEY for local mode
+
+## Option B: Cloud Hindsight API (if you have access)
+# HINDSIGHT_BACKEND=http
+# HINDSIGHT_BASE_URL=https://api.hindsight.vectorize.io
+# HINDSIGHT_API_KEY=<your-hindsight-api-key>
+# HINDSIGHT_PROJECT=ramp-onboarding-demo
+# Optional: Custom endpoint paths if API uses different routes
+# HINDSIGHT_SEARCH_PATH=/search
+# HINDSIGHT_WRITE_PATH=/records  
+# HINDSIGHT_NAMESPACES_PATH=/namespaces
+# HINDSIGHT_HEALTH_PATH=/health
 
 # Integrations
 INTEGRATIONS_MODE=demo
@@ -43,11 +56,28 @@ TICKET_BACKEND=jira
 # REDIS_URL=<your-redis-url>
 ```
 
-**IMPORTANT:** For production with local storage:
+**IMPORTANT - Memory Backend Options:**
+
+### Option A: Local File Storage (Recommended)
 - Set `HINDSIGHT_BACKEND=local`
-- Do NOT set `HINDSIGHT_BASE_URL` or `HINDSIGHT_API_KEY`
-- The data will be stored in `/app/data/hindsight_store.json` inside the container
-- This data will persist across deployments if you configure a persistent disk (see Render docs)
+- Do NOT set `HINDSIGHT_BASE_URL` or `HINDSIGHT_API_KEY`  
+- Data stored in `/app/data/hindsight_store.json`
+- Persists across deployments with persistent disk
+- **This is the stable, working option**
+
+### Option B: Cloud Hindsight API (Experimental)
+- Set `HINDSIGHT_BACKEND=http`
+- Set `HINDSIGHT_BASE_URL=https://api.hindsight.vectorize.io`
+- Set `HINDSIGHT_API_KEY=<your-key>`
+- **Note:** If the API is unavailable or returns errors, the system will automatically fall back to local storage
+- The code now includes automatic fallback for reliability
+
+**Current Status:** The Hindsight cloud API at `https://api.hindsight.vectorize.io` appears to return 404 errors, suggesting:
+1. The API might not be live yet
+2. Different endpoint URLs might be needed
+3. Additional authentication/project setup required
+
+The application will work fine with local storage until the cloud API is ready.
 
 **Service Settings:**
 - **Region:** Same as frontend (for lower latency)
