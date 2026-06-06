@@ -58,7 +58,17 @@ from backend.runtime_paths import reminder_store_path, ticket_store_path
 logger = logging.getLogger(__name__)
 REMINDER_LOG = reminder_store_path()
 TICKET_LOG = ticket_store_path()
-DB = AppDatabase.get()
+
+_db: AppDatabase | None = None
+
+
+def get_db() -> AppDatabase:
+    """Lazy DB singleton — must not init at import time (gunicorn worker race)."""
+    global _db
+    if _db is None:
+        _db = AppDatabase.get()
+    return _db
+
 
 MEMORY_CACHE_TTL = int(os.getenv("MEMORY_CACHE_TTL", "120"))
 SESSION_CACHE_TTL = int(os.getenv("SESSION_CACHE_TTL", "300"))
@@ -73,7 +83,7 @@ def _cached_session(session_id: str) -> dict | None:
     cached = cache.get(key)
     if cached is not None:
         return cached
-    session = DB.get_session(session_id)
+    session = get_db().get_session(session_id)
     if session is not None:
         cache.set(key, session, SESSION_CACHE_TTL)
     return session
@@ -90,6 +100,7 @@ ws_manager = WebSocketManager()
 async def lifespan(app: FastAPI):
     logger.info("Ramp backend starting up...")
     run_migrations()
+    get_db()  # init pool after migrations (never at import time)
     logger.info("Cache backend: %s", cache.backend_name())
     ensure_demo_data()
     ensure_employee_data()
@@ -273,7 +284,7 @@ async def ready(request: Request):
     Returns 503 if any dependency is unavailable.
     """
     groq_key_present = bool(os.getenv("GROQ_API_KEY", "").strip())
-    db_health = DB.healthcheck()
+    db_health = get_db().healthcheck()
     memory_backend = HindsightClient().backend_summary()
     store_paths = {
         "ticket_store": str(TICKET_LOG),
@@ -331,7 +342,7 @@ async def db_stats_endpoint():
     - Status distributions
     - Time-based metrics (sessions created today, events logged)
     """
-    return DB.get_database_stats()
+    return get_db().get_database_stats()
 
 
 @app.get("/health-detailed", tags=["health"])
@@ -347,9 +358,9 @@ async def health_detailed():
     Use for manual debugging. Returns 200 even if degraded; check `status` field.
     """
     groq_key_present = bool(os.getenv("GROQ_API_KEY", "").strip())
-    db_health = DB.healthcheck()
+    db_health = get_db().healthcheck()
     memory_backend = HindsightClient().backend_summary()
-    db_stats = DB.get_database_stats()
+    db_stats = get_db().get_database_stats()
     
     return {
         "status": "ok",
@@ -391,7 +402,7 @@ async def create_session_endpoint(request: Request, payload: SessionRequest):
         employment_type=payload.employee_type,
         metadata=payload.metadata,
     )
-    DB.insert_audit_event(
+    get_db().insert_audit_event(
         event_type="session.created",
         actor=request.state.auth.subject,
         session_id=session["session_id"],
@@ -424,7 +435,7 @@ async def list_sessions_endpoint():
     Returns the 100 most recent sessions ordered by creation time (newest first).
     Useful for monitoring active onboarding sessions.
     """
-    return {"sessions": DB.list_sessions()}
+    return {"sessions": get_db().list_sessions()}
 
 
 @app.get("/memories", tags=["memory"])
@@ -490,7 +501,7 @@ async def reminders():
     - Onboarding milestone checks
     - Access request verifications
     """
-    reminders_list = DB.list_reminders()
+    reminders_list = get_db().list_reminders()
     metrics.gauge("reminders_total", len(reminders_list))
     metrics.inc("api_reminders_fetched")
     return {"reminders": reminders_list}
@@ -506,7 +517,7 @@ async def tickets():
     - Equipment provisioning
     - Account setup
     """
-    tickets_list = DB.list_tickets()
+    tickets_list = get_db().list_tickets()
     metrics.gauge("tickets_total", len(tickets_list))
     metrics.inc("api_tickets_fetched")
     return {"tickets": tickets_list}
@@ -525,7 +536,7 @@ async def audit():
     
     Useful for compliance, debugging, and user activity tracking.
     """
-    events = DB.list_audit_events()
+    events = get_db().list_audit_events()
     metrics.inc("api_audit_fetched")
     return {"events": events}
 
@@ -546,7 +557,7 @@ async def demo_reset():
     ingestion = ensure_ingestion_data()
     _invalidate_memory_cache()
     cache.clear()
-    DB.insert_audit_event(event_type="demo.reset", payload={"reset": True, "ingestion": ingestion})
+    get_db().insert_audit_event(event_type="demo.reset", payload={"reset": True, "ingestion": ingestion})
     return {
         "status": "reset",
         "memories_seeded": True,
@@ -622,7 +633,7 @@ async def session_messages(session_id: str):
     """Chat history for a session."""
     if not _cached_session(session_id):
         raise HTTPException(status_code=404, detail="Session not found")
-    return {"session_id": session_id, "messages": DB.list_chat_messages(session_id)}
+    return {"session_id": session_id, "messages": get_db().list_chat_messages(session_id)}
 
 
 @app.post("/feedback", tags=["chat"])
@@ -632,7 +643,7 @@ async def submit_feedback(request: Request, payload: FeedbackRequest):
     from backend.interfaces import MemoryItem
     from backend.memory.hindsight_client import HindsightClient
 
-    record = DB.insert_feedback(
+    record = get_db().insert_feedback(
         session_id=payload.session_id or "",
         helpful=payload.helpful,
         comment=payload.comment,
@@ -650,7 +661,7 @@ async def submit_feedback(request: Request, payload: FeedbackRequest):
                 relevance_score=0.95,
             )
         )
-    DB.insert_audit_event(
+    get_db().insert_audit_event(
         event_type="feedback.submitted",
         session_id=payload.session_id or "",
         payload={"helpful": payload.helpful, "team": payload.team},
@@ -661,7 +672,7 @@ async def submit_feedback(request: Request, payload: FeedbackRequest):
 @app.get("/reminders/{reminder_id}/ics", tags=["data"])
 async def reminder_ics(reminder_id: str):
     """Download a calendar invite for a scheduled reminder."""
-    reminder = DB.get_reminder(reminder_id)
+    reminder = get_db().get_reminder(reminder_id)
     if not reminder:
         raise HTTPException(status_code=404, detail="Reminder not found")
     ics = (
@@ -731,7 +742,7 @@ async def oidc_login(redirect_uri: str, state: str = None):
             state=state
         )
         
-        DB.insert_audit_event(
+        get_db().insert_audit_event(
             event_type="auth.oidc.login_initiated",
             payload={"provider": os.getenv("OIDC_PROVIDER")}
         )
@@ -812,7 +823,7 @@ async def oidc_callback(payload: OidcCallbackRequest):
         )
         session_id = session["session_id"]
         
-        DB.insert_audit_event(
+        get_db().insert_audit_event(
             event_type="auth.oidc.login_completed",
             actor=subject,
             session_id=session_id,
@@ -929,7 +940,7 @@ async def chat(request: Request, payload: OnboardingRequest) -> AgentResponse:
 
     try:
         cache.delete(f"session:{payload.session_id}")
-        DB.upsert_session(
+        get_db().upsert_session(
             session_id=payload.session_id,
             user_name=payload.name,
             team_name=payload.team,
@@ -938,7 +949,7 @@ async def chat(request: Request, payload: OnboardingRequest) -> AgentResponse:
             auth_subject=request.state.auth.subject,
             metadata={"demo_mode": payload.demo_mode or "person10"},
         )
-        DB.insert_audit_event(
+        get_db().insert_audit_event(
             event_type="chat.requested",
             actor=request.state.auth.subject,
             session_id=payload.session_id,
@@ -952,7 +963,7 @@ async def chat(request: Request, payload: OnboardingRequest) -> AgentResponse:
             },
         )
         metrics.inc("chat_requests_total", team=payload.team, employment_type=payload.employee_type)
-        DB.insert_chat_message(
+        get_db().insert_chat_message(
             session_id=payload.session_id,
             role="user",
             content=payload.query,
@@ -960,7 +971,7 @@ async def chat(request: Request, payload: OnboardingRequest) -> AgentResponse:
         )
         agent = get_agent()
         response = await agent.run(payload)
-        DB.insert_chat_message(
+        get_db().insert_chat_message(
             session_id=payload.session_id,
             role="agent",
             content=response.message,
@@ -970,7 +981,7 @@ async def chat(request: Request, payload: OnboardingRequest) -> AgentResponse:
                 "memory_count": len(response.memories_used),
             },
         )
-        DB.insert_audit_event(
+        get_db().insert_audit_event(
             event_type="chat.completed",
             actor=request.state.auth.subject,
             session_id=payload.session_id,
@@ -1130,7 +1141,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str, user_id: str
         await websocket.close(code=4000, reason="Missing session_id")
         return
     
-    if not DB.get_session(session_id):
+    if not get_db().get_session(session_id):
         await websocket.close(code=4004, reason=f"Session {session_id} not found")
         return
     

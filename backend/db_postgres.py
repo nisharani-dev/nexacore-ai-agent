@@ -11,6 +11,7 @@ Requires DATABASE_URL environment variable (postgresql://user:pass@host:port/db)
 from __future__ import annotations
 
 import json
+import logging
 import os
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -20,6 +21,8 @@ from uuid import uuid4
 import psycopg2
 import psycopg2.extras
 from psycopg2.pool import SimpleConnectionPool
+
+logger = logging.getLogger(__name__)
 
 
 def utc_now_iso() -> str:
@@ -63,7 +66,9 @@ class AppDatabasePostgres:
             self._pool.putconn(connection)
 
     def _initialize(self) -> None:
-        """Create tables and indexes on startup."""
+        """Create tables and indexes on startup (chat/feedback not in Alembic yet)."""
+        if os.getenv("SKIP_DB_INIT", "").lower() in {"1", "true", "yes"}:
+            return
         statements = [
             """
             CREATE TABLE IF NOT EXISTS tickets (
@@ -170,7 +175,6 @@ class AppDatabasePostgres:
         ]
         with self.connect() as connection:
             cursor = connection.cursor()
-            # Advisory lock prevents race between gunicorn workers on startup
             cursor.execute("SELECT pg_advisory_lock(12345678)")
             try:
                 for statement in statements:
