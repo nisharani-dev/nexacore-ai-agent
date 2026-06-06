@@ -192,15 +192,49 @@ app.add_middleware(LoggingMiddleware)
 
 @app.middleware("http")
 async def request_context_middleware(request: Request, call_next):
-
-    if request.method == "OPTIONS":
-        return await call_next(request)
-
     request_id = request.headers.get("x-request-id", str(uuid.uuid4()))
     request.state.request_id = request_id
     request.state.auth = authenticate_request(request)
-
-    ...
+    start = perf_counter()
+    metrics.inc("http_requests_started_total", method=request.method, path=request.url.path)
+    try:
+        response = await call_next(request)
+    except Exception:
+        metrics.inc("http_requests_failed_total", method=request.method, path=request.url.path)
+        logger.exception("Unhandled request failure | request_id=%s | path=%s", request_id, request.url.path)
+        raise
+    duration_ms = round((perf_counter() - start) * 1000, 2)
+    response.headers["x-request-id"] = request_id
+    metrics.inc(
+        "http_requests_total",
+        method=request.method,
+        path=request.url.path,
+        status=str(response.status_code),
+    )
+    metrics.inc(
+        "http_request_duration_ms_total",
+        amount=duration_ms,
+        method=request.method,
+        path=request.url.path,
+    )
+    # Record latency histogram
+    metrics.observe(
+        "http_request_duration_ms",
+        duration_ms,
+        method=request.method,
+        path=request.url.path,
+    )
+    # Update active request gauges
+    metrics.gauge("http_requests_in_flight", max(0, metrics._counters.get("http_requests_started_total", 0) - metrics._counters.get("http_requests_total", 0)))
+    logger.info(
+        "request complete | request_id=%s | method=%s | path=%s | status=%s | duration_ms=%s",
+        request_id,
+        request.method,
+        request.url.path,
+        response.status_code,
+        duration_ms,
+    )
+    return response
 
 
 @app.get("/openapi.json", include_in_schema=False)
