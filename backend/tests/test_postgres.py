@@ -12,8 +12,10 @@ pytestmark = pytest.mark.skipif(
 
 @pytest.fixture
 def postgres_db():
+    from backend.db_migrate import run_migrations
     from backend.db_postgres import AppDatabasePostgres
 
+    run_migrations()
     AppDatabasePostgres._instance = None
     AppDatabasePostgres._pool = None
     db = AppDatabasePostgres()
