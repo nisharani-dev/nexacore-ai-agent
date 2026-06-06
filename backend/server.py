@@ -46,7 +46,6 @@ from backend.analytics import get_analytics_instance
 from backend.analytics_summary import build_analytics_summary
 from backend.cache import cache
 from backend.compliance import ComplianceManager
-from backend.db_migrate import run_migrations
 from backend.interfaces import FeedbackRequest
 from backend.rbac import Permission, get_rbac
 from backend.rbac_deps import require_permission
@@ -99,7 +98,7 @@ ws_manager = WebSocketManager()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Ramp backend starting up...")
-    run_migrations()
+    # Migrations run once in gunicorn master (gunicorn.conf.on_starting), not per worker.
     get_db()  # init pool after migrations (never at import time)
     logger.info("Cache backend: %s", cache.backend_name())
     ensure_demo_data()

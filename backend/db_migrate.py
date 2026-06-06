@@ -2,7 +2,7 @@
 db_migrate.py
 -------------
 Run Alembic migrations when DATABASE_URL points at Postgres.
-Uses a pg_advisory_lock so only one gunicorn worker runs migrations.
+Called once from gunicorn master (on_starting) before workers fork.
 """
 
 from __future__ import annotations
@@ -26,16 +26,7 @@ def run_migrations() -> None:
     conn.autocommit = True
     cur = conn.cursor()
 
-    # Only the worker that gets the lock runs migrations; others skip.
-    cur.execute("SELECT pg_try_advisory_lock(87654321)")
-    got_lock = cur.fetchone()[0]
-
-    if not got_lock:
-        logger.info("Another worker is running migrations, skipping.")
-        cur.close()
-        conn.close()
-        return
-
+    cur.execute("SELECT pg_advisory_lock(87654321)")
     try:
         from alembic import command
         from alembic.config import Config
