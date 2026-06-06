@@ -170,8 +170,13 @@ class AppDatabasePostgres:
         ]
         with self.connect() as connection:
             cursor = connection.cursor()
-            for statement in statements:
-                cursor.execute(statement)
+            # Advisory lock prevents race between gunicorn workers on startup
+            cursor.execute("SELECT pg_advisory_lock(12345678)")
+            try:
+                for statement in statements:
+                    cursor.execute(statement)
+            finally:
+                cursor.execute("SELECT pg_advisory_unlock(12345678)")
             cursor.close()
 
     def healthcheck(self) -> dict[str, Any]:
