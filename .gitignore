@@ -11,3 +11,19 @@ reminder_log.json
 ticket_log.json
 logs/
 .pytest_cache/
+
+# Test artifacts
+.coverage
+coverage.xml
+htmlcov/
+
+# Vite cache
+.vite/
+
+# Runtime scripts (one-off, not part of the app)
+discover_hindsight_endpoints.py
+test_hindsight_api.py
+test_all_endpoints.sh
+
+# IDE
+.vscode/
