@@ -19,4 +19,4 @@ RUN mkdir -p /app/data
 
 EXPOSE 8000
 
-CMD ["python", "-m", "backend.main"]
+CMD ["gunicorn", "backend.server:app", "-c", "backend/gunicorn.conf.py"]

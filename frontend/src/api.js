@@ -8,10 +8,21 @@ const USE_STREAM = import.meta.env.VITE_USE_STREAM === "true";
 
 const mockDelay = (ms) => new Promise((res) => setTimeout(res, ms));
 
+function authHeaders() {
+  const headers = {};
+  const token = localStorage.getItem("oidc_id_token") || localStorage.getItem("oidc_access_token");
+  if (token) headers.Authorization = `Bearer ${token}`;
+  return headers;
+}
+
 function sessionHeaders(sessionId) {
-  const headers = { "Content-Type": "application/json" };
+  const headers = { "Content-Type": "application/json", ...authHeaders() };
   if (sessionId) headers["X-Session-ID"] = sessionId;
   return headers;
+}
+
+function defaultHeaders() {
+  return { ...authHeaders() };
 }
 
 function mapResponse(data) {
@@ -126,7 +137,8 @@ export async function getMemories(teamPath, personaMode = "person1", employmentT
   }
 
   const res = await fetch(
-    `${API_BASE}/memories?team=${encodeURIComponent(teamPath)}&employee_type=${encodeURIComponent(employmentType)}&role=${encodeURIComponent(role)}&demo_mode=${encodeURIComponent(personaMode)}`
+    `${API_BASE}/memories?team=${encodeURIComponent(teamPath)}&employee_type=${encodeURIComponent(employmentType)}&role=${encodeURIComponent(role)}&demo_mode=${encodeURIComponent(personaMode)}`,
+    { headers: defaultHeaders() }
   );
   if (!res.ok) throw new Error(`Memory fetch error: ${res.status}`);
   const data = await res.json();
@@ -145,28 +157,28 @@ export async function getSessionMessages(sessionId) {
 
 export async function resetDemo() {
   if (USE_MOCK) return { status: "reset" };
-  const res = await fetch(`${API_BASE}/demo/reset`, { method: "POST" });
+  const res = await fetch(`${API_BASE}/demo/reset`, { method: "POST", headers: defaultHeaders() });
   if (!res.ok) throw new Error(`Reset error: ${res.status}`);
   return await res.json();
 }
 
 export async function getTickets() {
   if (USE_MOCK) return [];
-  const res = await fetch(`${API_BASE}/tickets`);
+  const res = await fetch(`${API_BASE}/tickets`, { headers: defaultHeaders() });
   if (!res.ok) return [];
   return (await res.json()).tickets ?? [];
 }
 
 export async function getReminders() {
   if (USE_MOCK) return [];
-  const res = await fetch(`${API_BASE}/reminders`);
+  const res = await fetch(`${API_BASE}/reminders`, { headers: defaultHeaders() });
   if (!res.ok) return [];
   return (await res.json()).reminders ?? [];
 }
 
 export async function getAudit() {
   if (USE_MOCK) return [];
-  const res = await fetch(`${API_BASE}/audit`);
+  const res = await fetch(`${API_BASE}/audit`, { headers: defaultHeaders() });
   if (!res.ok) return [];
   return (await res.json()).events ?? [];
 }
@@ -216,6 +228,17 @@ export async function startOidcLogin() {
   if (!res.ok) throw new Error(`OIDC login error: ${res.status}`);
   const data = await res.json();
   if (data.authorization_url) window.location.href = data.authorization_url;
+}
+
+export async function completeOidcLogin(code, state = "ramp") {
+  const redirectUri = `${window.location.origin}/callback`;
+  const res = await fetch(`${API_BASE}/auth/oidc/callback`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ code, redirect_uri: redirectUri, state }),
+  });
+  if (!res.ok) throw new Error(`OIDC callback error: ${res.status}`);
+  return await res.json();
 }
 
 function mapScope(level) {

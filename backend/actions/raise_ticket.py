@@ -24,7 +24,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from backend.db import AppDatabase
-from backend.integrations.jira import JiraClient
+from backend.integrations.ticket_router import create_external_ticket
 
 
 def raise_ticket(
@@ -46,10 +46,8 @@ def raise_ticket(
     }
     jira_priority = priority_map.get(priority.lower(), "Medium")
 
-    # Create ticket via Jira
-    jira_client = JiraClient()
     try:
-        jira_result = jira_client.create_ticket(
+        external_result = create_external_ticket(
             summary=title,
             description=description,
             issue_type="Task",
@@ -57,7 +55,10 @@ def raise_ticket(
             priority=jira_priority,
             labels=["onboarding", "auto-generated"],
         )
-        ticket_key = jira_result.get("ticket_key", f"IT-{hashlib.md5((title + assignee_team).encode()).hexdigest()[:8].upper()}")
+        ticket_key = external_result.get(
+            "ticket_key",
+            f"IT-{hashlib.md5((title + assignee_team).encode()).hexdigest()[:8].upper()}",
+        )
     except Exception as e:
         # Fallback to local ID if Jira fails
         seed = f"{title}|{description}|{assignee_team}|{priority}"

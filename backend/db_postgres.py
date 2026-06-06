@@ -11,6 +11,7 @@ Requires DATABASE_URL environment variable (postgresql://user:pass@host:port/db)
 from __future__ import annotations
 
 import json
+import logging
 import os
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -20,6 +21,8 @@ from uuid import uuid4
 import psycopg2
 import psycopg2.extras
 from psycopg2.pool import SimpleConnectionPool
+
+logger = logging.getLogger(__name__)
 
 
 def utc_now_iso() -> str:
@@ -41,7 +44,7 @@ class AppDatabasePostgres:
         self.database_url = url
         # Create connection pool (min 1, max 5 connections)
         self._pool = SimpleConnectionPool(1, 5, url)
-        self._initialize()
+        # Schema is managed by Alembic (gunicorn master on_starting); no DDL here.
 
     @classmethod
     def get(cls) -> "AppDatabasePostgres":
@@ -61,107 +64,6 @@ class AppDatabasePostgres:
             raise
         finally:
             self._pool.putconn(connection)
-
-    def _initialize(self) -> None:
-        """Create tables and indexes on startup."""
-        statements = [
-            # Tables
-            """CREATE TABLE IF NOT EXISTS tickets (
-                id TEXT PRIMARY KEY,
-                title TEXT NOT NULL,
-                description TEXT NOT NULL,
-                assignee_team TEXT NOT NULL,
-                priority TEXT NOT NULL,
-                status TEXT NOT NULL,
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL
-            )""",
-            """CREATE TABLE IF NOT EXISTS reminders (
-                id TEXT PRIMARY KEY,
-                recipient TEXT NOT NULL,
-                message TEXT NOT NULL,
-                due_in_hours INTEGER NOT NULL,
-                scheduled_for TEXT NOT NULL,
-                status TEXT NOT NULL,
-                created_at TEXT NOT NULL
-            )""",
-            """CREATE TABLE IF NOT EXISTS sessions (
-                id TEXT PRIMARY KEY,
-                user_name TEXT,
-                team_name TEXT,
-                role_title TEXT,
-                employment_type TEXT,
-                auth_subject TEXT,
-                created_at TEXT NOT NULL,
-                last_seen_at TEXT NOT NULL,
-                metadata_json TEXT NOT NULL
-            )""",
-            """CREATE TABLE IF NOT EXISTS audit_events (
-                id TEXT PRIMARY KEY,
-                event_type TEXT NOT NULL,
-                actor TEXT,
-                session_id TEXT,
-                request_id TEXT,
-                payload_json TEXT NOT NULL,
-                created_at TEXT NOT NULL
-            )""",
-            """CREATE TABLE IF NOT EXISTS memory_metadata (
-                id TEXT PRIMARY KEY,
-                namespace TEXT NOT NULL,
-                content_hash TEXT NOT NULL,
-                level TEXT NOT NULL,
-                source TEXT NOT NULL,
-                tags_json TEXT NOT NULL,
-                metadata_json TEXT NOT NULL,
-                backend_kind TEXT NOT NULL,
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL,
-                UNIQUE(content_hash, namespace)
-            )""",
-            """CREATE TABLE IF NOT EXISTS chat_messages (
-                id TEXT PRIMARY KEY,
-                session_id TEXT NOT NULL,
-                role TEXT NOT NULL,
-                content TEXT NOT NULL,
-                metadata_json TEXT NOT NULL,
-                created_at TEXT NOT NULL
-            )""",
-            """CREATE TABLE IF NOT EXISTS feedback (
-                id TEXT PRIMARY KEY,
-                session_id TEXT,
-                message_id TEXT,
-                helpful BOOLEAN NOT NULL,
-                comment TEXT NOT NULL,
-                team TEXT NOT NULL,
-                query TEXT NOT NULL,
-                created_at TEXT NOT NULL
-            )""",
-            # Indexes
-            "CREATE INDEX IF NOT EXISTS idx_tickets_team ON tickets(assignee_team)",
-            "CREATE INDEX IF NOT EXISTS idx_tickets_status ON tickets(status)",
-            "CREATE INDEX IF NOT EXISTS idx_tickets_created_at ON tickets(created_at DESC)",
-            "CREATE INDEX IF NOT EXISTS idx_reminders_recipient ON reminders(recipient)",
-            "CREATE INDEX IF NOT EXISTS idx_reminders_status ON reminders(status)",
-            "CREATE INDEX IF NOT EXISTS idx_reminders_created_at ON reminders(created_at DESC)",
-            "CREATE INDEX IF NOT EXISTS idx_sessions_team_name ON sessions(team_name)",
-            "CREATE INDEX IF NOT EXISTS idx_sessions_created_at ON sessions(created_at DESC)",
-            "CREATE INDEX IF NOT EXISTS idx_sessions_employment_type ON sessions(employment_type)",
-            "CREATE INDEX IF NOT EXISTS idx_audit_event_type ON audit_events(event_type)",
-            "CREATE INDEX IF NOT EXISTS idx_audit_session_id ON audit_events(session_id)",
-            "CREATE INDEX IF NOT EXISTS idx_audit_created_at ON audit_events(created_at DESC)",
-            "CREATE INDEX IF NOT EXISTS idx_memory_namespace ON memory_metadata(namespace)",
-            "CREATE INDEX IF NOT EXISTS idx_memory_level ON memory_metadata(level)",
-            "CREATE INDEX IF NOT EXISTS idx_memory_source ON memory_metadata(source)",
-            "CREATE INDEX IF NOT EXISTS idx_memory_created_at ON memory_metadata(created_at DESC)",
-            "CREATE INDEX IF NOT EXISTS idx_chat_messages_session ON chat_messages(session_id)",
-            "CREATE INDEX IF NOT EXISTS idx_chat_messages_created_at ON chat_messages(created_at DESC)",
-            "CREATE INDEX IF NOT EXISTS idx_feedback_session ON feedback(session_id)",
-        ]
-        with self.connect() as connection:
-            cursor = connection.cursor()
-            for stmt in statements:
-                cursor.execute(stmt)
-            cursor.close()
 
     def healthcheck(self) -> dict[str, Any]:
         with self.connect() as connection:
@@ -528,36 +430,54 @@ class AppDatabasePostgres:
                 INSERT INTO chat_messages (id, session_id, role, content, metadata_json, created_at)
                 VALUES (%s, %s, %s, %s, %s, %s)
                 """,
-                (message_id, session_id, role, content, json.dumps(metadata or {}, ensure_ascii=True), created_at),
+                (
+                    message_id,
+                    session_id,
+                    role,
+                    content,
+                    json.dumps(metadata or {}, ensure_ascii=True),
+                    created_at,
+                ),
             )
             cursor.close()
-        return {"id": message_id, "session_id": session_id, "role": role, "content": content, "created_at": created_at}
+        return {
+            "id": message_id,
+            "session_id": session_id,
+            "role": role,
+            "content": content,
+            "metadata": metadata or {},
+            "created_at": created_at,
+        }
 
-    def list_chat_messages(self, session_id: str, *, limit: int = 100) -> list[dict[str, Any]]:
+    def list_chat_messages(self, session_id: str, *, limit: int = 200) -> list[dict[str, Any]]:
         with self.connect() as connection:
             cursor = connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
             cursor.execute(
-                "SELECT * FROM chat_messages WHERE session_id = %s ORDER BY created_at ASC LIMIT %s",
+                """
+                SELECT * FROM chat_messages
+                WHERE session_id = %s
+                ORDER BY created_at ASC
+                LIMIT %s
+                """,
                 (session_id, limit),
             )
             rows = cursor.fetchall()
             cursor.close()
-        messages = []
+        messages: list[dict[str, Any]] = []
         for row in rows:
-            msg = dict(row)
-            msg["metadata"] = json.loads(msg.pop("metadata_json"))
-            messages.append(msg)
+            message = dict(row)
+            message["metadata"] = json.loads(message.pop("metadata_json"))
+            messages.append(message)
         return messages
 
     def insert_feedback(
         self,
         *,
         session_id: str = "",
-        message_id: str = "",
         helpful: bool,
         comment: str = "",
-        team: str = "",
-        query: str = "",
+        team_name: str = "",
+        query_text: str = "",
     ) -> dict[str, Any]:
         feedback_id = str(uuid4())
         created_at = utc_now_iso()
@@ -565,20 +485,41 @@ class AppDatabasePostgres:
             cursor = connection.cursor()
             cursor.execute(
                 """
-                INSERT INTO feedback (id, session_id, message_id, helpful, comment, team, query, created_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO feedback (id, session_id, helpful, comment, team_name, query_text, created_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
                 """,
-                (feedback_id, session_id, message_id, helpful, comment, team, query, created_at),
+                (
+                    feedback_id,
+                    session_id,
+                    1 if helpful else 0,
+                    comment,
+                    team_name,
+                    query_text,
+                    created_at,
+                ),
             )
             cursor.close()
-        return {"id": feedback_id, "helpful": helpful, "created_at": created_at}
+        return {
+            "id": feedback_id,
+            "session_id": session_id,
+            "helpful": helpful,
+            "comment": comment,
+            "team_name": team_name,
+            "query_text": query_text,
+            "created_at": created_at,
+        }
 
     def feedback_summary(self) -> dict[str, Any]:
         with self.connect() as connection:
             cursor = connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
             cursor.execute("SELECT COUNT(*) as total FROM feedback")
             total = cursor.fetchone()["total"]
-            cursor.execute("SELECT COUNT(*) as count FROM feedback WHERE helpful = true")
-            helpful = cursor.fetchone()["count"]
+            cursor.execute("SELECT COUNT(*) as helpful FROM feedback WHERE helpful = 1")
+            helpful = cursor.fetchone()["helpful"]
             cursor.close()
-        return {"total": total, "helpful": helpful, "unhelpful": total - helpful}
+        return {
+            "total": total,
+            "helpful": helpful,
+            "not_helpful": total - helpful,
+            "helpful_rate": round(helpful / total, 3) if total else 0.0,
+        }

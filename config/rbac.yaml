@@ -1,0 +1,54 @@
+default_role: user
+group_role_mapping:
+  ramp-admins: admin
+  ramp-managers: manager
+  onboarding-admins: admin
+oidc_role_mapping:
+  admin: admin
+  manager: manager
+  system_admin: admin
+roles:
+  admin:
+    name: admin
+    description: System administrator with full access
+    permissions:
+      - system_admin
+      - manage_users
+      - manage_roles
+      - view_audit_log
+      - view_metrics
+      - create_ticket
+      - edit_ticket
+      - delete_ticket
+      - view_ticket
+      - create_reminder
+      - edit_reminder
+      - delete_reminder
+      - view_reminder
+  manager:
+    name: manager
+    description: Team manager with moderator access
+    permissions:
+      - create_ticket
+      - edit_ticket
+      - delete_ticket
+      - view_ticket
+      - create_reminder
+      - edit_reminder
+      - delete_reminder
+      - view_reminder
+      - view_audit_log
+  user:
+    name: user
+    description: Standard user access
+    permissions:
+      - create_ticket
+      - view_ticket
+      - create_reminder
+      - view_reminder
+  guest:
+    name: guest
+    description: Limited guest access
+    permissions:
+      - view_ticket
+      - view_reminder

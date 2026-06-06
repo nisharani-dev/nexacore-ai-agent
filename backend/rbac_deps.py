@@ -8,10 +8,8 @@ from __future__ import annotations
 
 from fastapi import HTTPException, Request
 
-from backend.rbac import Permission, RBAC
-from backend.settings import app_env
-
-_rbac = RBAC()
+from backend.rbac import Permission, get_rbac
+from backend.settings import auth_required, rbac_enforced
 
 
 def _subject(request: Request) -> str:
@@ -23,10 +21,12 @@ def _subject(request: Request) -> str:
 
 def require_permission(permission: Permission):
     async def _checker(request: Request) -> None:
-        if app_env() == "development":
+        if not rbac_enforced():
             return
         subject = _subject(request)
-        if not _rbac.has_permission(subject, permission.value):
+        if subject in {"anonymous", "public"} and auth_required():
+            raise HTTPException(status_code=401, detail="Authentication required")
+        if not get_rbac().has_permission(subject, permission.value):
             raise HTTPException(
                 status_code=403,
                 detail=f"Permission denied: {permission.value}",

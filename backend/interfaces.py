@@ -148,3 +148,15 @@ class SessionRequest(BaseModel):
         if isinstance(payload.get("employee_type"), str):
             payload["employee_type"] = payload["employee_type"].lower()
         return payload
+
+
+class OidcCallbackRequest(BaseModel):
+    code: str
+    redirect_uri: str
+    state: Optional[str] = None
+
+
+class ConsentRequest(BaseModel):
+    user_id: Optional[str] = None
+    category: str = "analytics"
+    granted: bool = False

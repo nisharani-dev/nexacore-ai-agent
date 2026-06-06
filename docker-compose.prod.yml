@@ -41,7 +41,7 @@ services:
     environment:
       DATABASE_URL: postgresql://ramp:ramp_dev_password@postgres:5432/ramp
       REDIS_URL: redis://redis:6379/0
-      HINDSIGHT_BACKEND: local
+      # HINDSIGHT_BACKEND comes from .env (defaults to local there)
     ports:
       - "8000:8000"
     volumes:

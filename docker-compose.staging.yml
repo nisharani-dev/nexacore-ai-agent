@@ -40,8 +40,8 @@ services:
   # Backend API
   backend:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
       args:
         BUILDKIT_INLINE_CACHE: 1
     container_name: nexacore-backend-staging
@@ -61,23 +61,21 @@ services:
       GROQ_API_KEY: ${GROQ_API_KEY}
       GROQ_MODEL: ${GROQ_MODEL:-mixtral-8x7b-32768}
       
-      # Memory
-      MEMORY_BACKEND: json
-      HINDSIGHT_API_URL: http://localhost:8001
+      # Memory / Hindsight
+      HINDSIGHT_BACKEND: local
+      HINDSIGHT_STORE_PATH: /app/data/hindsight_store.json
       
-      # Logging
-      ENABLE_STRUCTURED_LOGGING: "true"
+      # Integrations
+      INTEGRATIONS_MODE: ${INTEGRATIONS_MODE:-demo}
+      TICKET_BACKEND: ${TICKET_BACKEND:-jira}
       
       # Auth
       AUTH_REQUIRED: "true"
       APP_API_KEY: ${APP_API_KEY:-staging_key_change_me}
+      RBAC_ENFORCE: "true"
       
       # CORS
-      CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS:-http://localhost:3000,http://frontend:3000}
-      
-      # Feature flags
-      ENABLE_WEBSOCKET: "true"
-      ENABLE_REDIS: "true"
+      CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS:-http://localhost:3000,http://localhost:3001,http://frontend:3000}
     ports:
       - "8001:8000"  # Different port to avoid conflict with dev
     volumes:
@@ -101,8 +99,8 @@ services:
   # Frontend
   frontend:
     build:
-      context: ./frontend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: frontend/Dockerfile
       args:
         VITE_API_BASE: /api
         VITE_SOCKET_URL: ws://backend:8000

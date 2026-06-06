@@ -8,6 +8,7 @@ import pytest
 
 from backend.integrations.email import EmailClient
 from backend.integrations.jira import JiraClient
+from backend.integrations.ticket_router import create_external_ticket
 
 
 class TestJiraClient:
@@ -103,3 +104,13 @@ class TestEmailClient:
         # No SMTP credentials set, should be mock
         client = EmailClient(smtp_user="", smtp_password="")
         assert client.mock_mode is True
+
+
+def test_ticket_router_defaults_to_jira_mock():
+    result = create_external_ticket(
+        summary="Router smoke test",
+        description="ticket router",
+        assignee="IT Helpdesk",
+        priority="Medium",
+    )
+    assert "ticket_key" in result

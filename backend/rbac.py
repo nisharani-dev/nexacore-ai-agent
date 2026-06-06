@@ -28,10 +28,11 @@ Usage:
 
 import os
 from enum import Enum
+from pathlib import Path
 from typing import Any, Optional, Set
 
 import yaml
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 
 from backend.logging_config import get_logger
 
@@ -65,23 +66,23 @@ class Permission(str, Enum):
 
 class Role(BaseModel):
     """Role definition."""
-    
+
+    model_config = ConfigDict(extra="allow")
+
     name: str
     description: Optional[str] = None
     permissions: Set[str] = set()
-    
-    class Config:
-        extra = "allow"
 
 
 class RoleConfig(BaseModel):
     """Configuration for roles and permissions."""
-    
+
+    model_config = ConfigDict(extra="allow")
+
     default_role: str = "user"
     roles: dict[str, Role] = {}
-    
-    class Config:
-        extra = "allow"
+    group_role_mapping: dict[str, str] = Field(default_factory=dict)
+    oidc_role_mapping: dict[str, str] = Field(default_factory=dict)
 
 
 class RBAC:
@@ -169,20 +170,62 @@ class RBAC:
     
     def _load_config(self) -> RoleConfig:
         """Load role configuration from file or environment."""
-        # Try to load from RBAC_CONFIG_FILE environment variable
         config_file = os.getenv("RBAC_CONFIG_FILE")
-        
+        if not config_file:
+            default_path = Path(__file__).resolve().parents[1] / "config" / "rbac.yaml"
+            if default_path.exists():
+                config_file = str(default_path)
+
         if config_file and os.path.exists(config_file):
             logger.info("Loading RBAC config", extra={"file": config_file})
-            with open(config_file) as f:
-                config_data = yaml.safe_load(f)
-            return RoleConfig(**config_data)
-        
-        # Use defaults
+            with open(config_file) as handle:
+                config_data = yaml.safe_load(handle) or {}
+            roles_data = config_data.get("roles", {})
+            roles = {
+                name: Role(
+                    name=data.get("name", name),
+                    description=data.get("description"),
+                    permissions=set(data.get("permissions", [])),
+                )
+                for name, data in roles_data.items()
+            }
+            if not roles:
+                roles = self.DEFAULT_ROLES
+            return RoleConfig(
+                default_role=config_data.get("default_role", "user"),
+                roles=roles,
+                group_role_mapping=config_data.get("group_role_mapping", {}),
+                oidc_role_mapping=config_data.get("oidc_role_mapping", {}),
+            )
+
         return RoleConfig(
             default_role="user",
             roles=self.DEFAULT_ROLES,
         )
+
+    def sync_oidc_roles(
+        self,
+        user_id: str,
+        *,
+        groups: list[str] | None = None,
+        roles: list[str] | None = None,
+    ) -> Set[str]:
+        """Map OIDC groups/roles to RBAC roles for a user."""
+        assigned: Set[str] = set()
+        for group in groups or []:
+            mapped = self.config.group_role_mapping.get(group)
+            if mapped:
+                assigned.add(mapped)
+        for role in roles or []:
+            mapped = self.config.oidc_role_mapping.get(role)
+            if mapped:
+                assigned.add(mapped)
+            elif role in self.config.roles:
+                assigned.add(role)
+        if not assigned:
+            assigned.add(self.config.default_role)
+        self.user_roles[user_id] = assigned
+        return assigned
     
     def get_roles(self, user_id: str) -> Set[str]:
         """Get roles assigned to user."""
@@ -348,7 +391,7 @@ class RBAC:
     def to_dict(self) -> dict[str, Any]:
         """Export current RBAC state."""
         return {
-            "config": self.config.dict(),
+            "config": self.config.model_dump(),
             "user_roles": {k: list(v) for k, v in self.user_roles.items()},
             "user_groups": {k: list(v) for k, v in self.user_groups.items()},
         }

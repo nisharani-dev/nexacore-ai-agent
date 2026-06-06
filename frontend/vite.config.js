@@ -7,6 +7,8 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     setupFiles: "./vitest.setup.js",
+    include: ["src/**/*.{test,spec}.{js,jsx}"],
+    exclude: ["e2e/**", "node_modules/**"],
   },
   server: {
     port: 5173,

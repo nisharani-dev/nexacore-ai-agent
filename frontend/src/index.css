@@ -1066,3 +1066,93 @@ body::after {
   color: var(--c4); border: 1px solid var(--c2);
   background: var(--cd); cursor: pointer;
 }
+
+/* Aliases for JSX class names not matching earlier selectors */
+.topbar-logo { display: flex; align-items: center; gap: 10px; }
+.topbar-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: var(--a3);
+  box-shadow: 0 0 10px var(--a3), 0 0 22px var(--ag);
+  animation: glow-pulse 2.5s ease-in-out infinite;
+}
+.topbar-name {
+  font-family: var(--mono); font-size: 13px; font-weight: 500;
+  letter-spacing: .14em; color: var(--t1);
+}
+.topbar-tag {
+  font-family: var(--mono); font-size: 10px; color: var(--t3);
+}
+.topbar-center { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+
+.ob-logo {
+  font-family: var(--mono); font-size: 22px; font-weight: 500;
+  letter-spacing: .14em; color: var(--t1); margin-bottom: 4px;
+  display: flex; align-items: center; gap: 10px;
+}
+.ob-dot {
+  width: 13px; height: 13px; border-radius: 50%;
+  background: var(--a3);
+  box-shadow: 0 0 14px var(--a3), 0 0 28px var(--ag);
+  animation: glow-pulse 2s ease-in-out infinite;
+}
+
+.msg-avatar {
+  width: 32px; height: 32px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--mono); font-size: 11px; font-weight: 500;
+  flex-shrink: 0;
+}
+.msg-avatar--agent {
+  background: radial-gradient(circle at 35% 35%, rgba(208,128,32,.3), rgba(208,128,32,.05));
+  border: 1px solid var(--a2); color: var(--a3);
+  box-shadow: 0 0 18px var(--ag);
+}
+.msg-avatar--user {
+  background: var(--bg5);
+  border: 1px solid var(--b3); color: var(--t2);
+}
+
+.bubble-meta {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 10px;
+}
+.bubble-sender {
+  font-family: var(--mono);
+  font-size: 10px; color: var(--a2);
+  letter-spacing: .06em; text-transform: uppercase;
+}
+.mem-badge-dot {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: var(--c3);
+  box-shadow: 0 0 6px var(--c3);
+  animation: glow-pulse 1.8s ease-in-out infinite;
+}
+
+.empty-icon {
+  font-size: 44px; line-height: 1;
+  animation: float 4s ease-in-out infinite;
+  filter: drop-shadow(0 0 18px var(--ag));
+}
+
+.action-card-text { flex: 1; line-height: 1.5; }
+.feedback-slot { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--b2); }
+.msg--new { animation: msg-in .22s cubic-bezier(.16,.84,.44,1); }
+
+.persona-banner-main { display: flex; flex-direction: column; gap: 2px; }
+.ops-row--audit .ops-row-title { color: var(--t3); font-size: 10px; }
+
+.suggestions {
+  display: flex; flex-wrap: wrap; gap: 7px;
+  margin-bottom: 8px;
+}
+.chip {
+  font-family: var(--mono); font-size: 10px;
+  padding: 5px 12px; border-radius: 4px;
+  border: 1px solid var(--b3); color: var(--t3);
+  background: var(--bg3); transition: .15s;
+}
+.chip:hover:not(:disabled) {
+  border-color: var(--a2); color: var(--a3);
+  background: var(--ad); box-shadow: 0 0 10px var(--ag);
+}
+.send-btn--loading { opacity: .6; pointer-events: none; }

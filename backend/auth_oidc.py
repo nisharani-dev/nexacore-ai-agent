@@ -35,7 +35,7 @@ from urllib.parse import urlencode
 
 import httpx
 import jwt
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from backend.logging_config import get_logger
 
@@ -55,9 +55,8 @@ class UserInfo(BaseModel):
     groups: Optional[list[str]] = None  # For Azure AD, Okta
     roles: Optional[list[str]] = None  # For custom providers
     org_id: Optional[str] = None  # Organization ID
-    
-    class Config:
-        extra = "allow"  # Allow additional fields from provider
+
+    model_config = ConfigDict(extra="allow")
 
 
 class TokenPayload(BaseModel):
