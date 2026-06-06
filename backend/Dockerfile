@@ -19,4 +19,9 @@ RUN mkdir -p /app/data
 
 EXPOSE 8000
 
-CMD ["python", "-m", "backend.main"]
+CMD ["gunicorn", "backend.server:app", \
+     "-w", "2", \
+     "-k", "uvicorn.workers.UvicornWorker", \
+     "--bind", "0.0.0.0:8000", \
+     "--timeout", "120", \
+     "--access-logfile", "-"]
