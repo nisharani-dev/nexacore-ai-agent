@@ -1,113 +1,44 @@
-# Render deployment configuration for NexaCore
-# https://render.com/docs/blueprint-spec
+# render.yaml — Render.com deployment config
+# Deploys the backend as a web service on Render's free tier.
+#
+# Setup:
+#   1. Go to https://dashboard.render.com
+#   2. New → Blueprint → connect your GitHub fork
+#   3. Render auto-detects this file and creates the service
+#   4. Add GROQ_API_KEY in the Render dashboard → Environment tab
 
 services:
-  # Hindsight Memory Service (Self-Hosted)
   - type: web
-    name: nexacore-hindsight
-    runtime: image
-    image:
-      url: ghcr.io/vectorize-io/hindsight:latest
-    plan: starter  # 512MB RAM minimum
-    region: oregon  # Match your other services
-    env:
-      - key: HINDSIGHT_API_LLM_PROVIDER
-        value: groq
-      - key: HINDSIGHT_API_LLM_API_KEY
-        sync: false  # Set manually in Render dashboard
-      - key: PORT
-        value: 8888
-    healthCheckPath: /health
-    disk:
-      name: hindsight-data
-      mountPath: /home/hindsight/.pg0
-      sizeGB: 1
-
-  # Backend API Service
-  - type: web
-    name: nexacore-backend
-    runtime: docker
-    dockerfilePath: ./backend/Dockerfile
-    dockerContext: .
-    plan: starter
+    name: ramp-backend
+    runtime: python
     region: oregon
-    env:
-      # Database
-      - key: DATABASE_URL
-        sync: false  # Set manually (Render Postgres)
-      
-      # LLM
-      - key: GROQ_API_KEY
-        sync: false
-      - key: GROQ_MODEL
-        value: openai/gpt-oss-20b
-      
-      # App
+    plan: free
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: python -m backend.main
+    envVars:
       - key: APP_ENV
         value: production
       - key: PORT
         value: 8000
       - key: LOG_LEVEL
         value: INFO
-      
-      # CORS
-      - key: CORS_ALLOW_ORIGINS
-        value: https://nexacore-frontend.onrender.com
-      - key: FRONTEND_URL
-        value: https://nexacore-frontend.onrender.com
-      
-      # Auth
-      - key: AUTH_REQUIRED
-        value: false
-      
-      # Hindsight (using self-hosted service)
       - key: HINDSIGHT_BACKEND
-        value: http
-      - key: HINDSIGHT_BASE_URL
-        fromService:
-          type: web
-          name: nexacore-hindsight
-          envVarKey: RENDER_EXTERNAL_URL
-      - key: HINDSIGHT_PROJECT
-        value: ramp-onboarding-demo
-      
-      # Integrations
+        value: local
       - key: INTEGRATIONS_MODE
         value: demo
-      - key: TICKET_BACKEND
-        value: jira
-    
-    healthCheckPath: /health
-    
-  # Frontend Service
-  - type: web
-    name: nexacore-frontend
-    runtime: docker
-    dockerfilePath: ./frontend/Dockerfile
-    dockerContext: .
-    plan: starter
-    region: oregon
-    env:
-      # Point to backend service
-      - key: BACKEND_URL
-        fromService:
-          type: web
-          name: nexacore-backend
-          envVarKey: RENDER_EXTERNAL_URL
-      - key: BACKEND_HOST
-        fromService:
-          type: web
-          name: nexacore-backend
-          envVarKey: RENDER_EXTERNAL_HOSTNAME
-      - key: VITE_API_BASE
-        value: /api
-    
-    healthCheckPath: /
-
-# Database
-databases:
-  - name: nexacore-db
-    databaseName: nexacore
-    user: nexacore
-    plan: starter  # Free tier available
-    region: oregon
+      - key: AUTH_REQUIRED
+        value: false
+      - key: DATA_DIR
+        value: /opt/render/project/src/data
+      - key: HINDSIGHT_STORE_PATH
+        value: /opt/render/project/src/data/hindsight_store.json
+      - key: GROQ_API_KEY
+        sync: false   # Set this manually in Render dashboard
+      - key: GROQ_MODEL
+        value: llama3-70b-8192
+      - key: CORS_ALLOW_ORIGINS
+        value: "*"    # Update to your Vercel URL after deploy
+    disk:
+      name: ramp-data
+      mountPath: /opt/render/project/src/data
+      sizeGB: 1
